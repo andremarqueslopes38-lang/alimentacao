@@ -343,7 +343,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal }) {
                 {/* Edit Actions */}
                 <div className="edit-actions-row">
                   <button className="btn-save" onClick={() => saveEdit(meal)}>
-                    <CheckIcon /> Guardar Alterações
+                    🤖 Guardar & Rever com a IA
                   </button>
                   <button className="btn-cancel" onClick={() => setEditingId(null)}>
                     Cancelar

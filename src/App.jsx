@@ -3,7 +3,7 @@ import MealPlan from './componets/MealPlan';
 import ShoppingList from './componets/ShoppingList';
 import AiChat from './componets/AiChat';
 import { DEFAULT_MEALS } from './data/meals';
-import { reviewMealChange } from './utils/nutritionReviewer';
+import { analyzeMealEdit } from './utils/nutritionReviewer';
 
 /* ── SVG Tab Icons ── */
 const IconCalendar = ({ active }) => (
@@ -73,7 +73,7 @@ export default function App() {
     {
       id: 'init-1',
       role: 'assistant',
-      text: 'Olá! 👋 Sou o teu assistente nutricional local. Estou a par do teu plano alimentar. Quando editares uma refeição, eu dou uma vista de olhos, faço um resumo e, se notar algo errado, dou-te 2 opções para decidires!',
+      text: 'Olá! 👋 Sou o teu assistente nutricional local. Estou a par do teu plano alimentar. Sempre que editares uma refeição, eu dou uma vista de olhos, faço um resumo detalhado e, caso note algum desequilíbrio, dou-te 2 opções para decidires!',
     },
   ]);
 
@@ -88,16 +88,22 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Called when user finishes editing a meal in MealPlan
+  // Called when user clicks "Guardar" on any meal in MealPlan
   const handleMealEdit = (meal, newDesc, newTitle, newTime) => {
-    const review = reviewMealChange(meal, newDesc, newTitle, newTime);
+    const review = analyzeMealEdit(meal, newDesc, newTitle, newTime);
+    const reviewId = `rev-${Date.now()}`;
+    const reviewWithId = { ...review, id: reviewId };
 
     if (review.hasIssue) {
-      // Trigger Review Modal and add review event to Chat
-      const reviewId = `rev-${Date.now()}`;
-      const reviewWithId = { ...review, id: reviewId };
-      setPendingReview(reviewWithId);
+      // 1. Temporarily save user's version in the plan pending choice
+      setMeals(prev => prev.map(m => m.id === meal.id ? {
+        ...m,
+        title: newTitle.trim() || m.title,
+        desc: newDesc || m.desc,
+        time: newTime || m.time,
+      } : m));
 
+      // 2. Add detailed review to Chat with the 2 choices
       setMessages(prev => [
         ...prev,
         {
@@ -106,9 +112,17 @@ export default function App() {
           type: 'meal_review',
           review: reviewWithId,
           status: 'pending',
-          text: `🤖 **Revisão da alteração em "${newTitle}":**\n${review.explanation}\n\nPreparas-te para escolher uma das opções abaixo:`,
+          text: `👀 **Dei uma vista de olhos na tua alteração em "${review.mealTitle}"!**\n\n` +
+            `📋 **Resumo da tua refeição:**\n${review.userDesc}\nHorário: ${review.mealTime}\n\n` +
+            `⚠️ **Alerta Nutricional — ${review.issueTitle}:**\n${review.issueExplanation}\n\n` +
+            `💡 **Sugestão Otimizada da IA:**\n${review.aiSuggestion}\n*(${review.prosAndCons})*\n\n` +
+            `O que preferes fazer? Escolhe uma das 2 opções abaixo:`,
         },
       ]);
+
+      // 3. Set pending modal AND jump straight to the Chat tab so user sees the review!
+      setPendingReview(reviewWithId);
+      setActiveTab('chat');
     } else {
       // Meal is healthy and balanced — Save directly!
       setMeals(prev => prev.map(m => m.id === meal.id ? {
@@ -118,14 +132,19 @@ export default function App() {
         time: newTime || m.time,
       } : m));
 
+      // Add positive summary to chat and jump to Chat
       setMessages(prev => [
         ...prev,
         {
           id: `ok-${Date.now()}`,
           role: 'assistant',
-          text: `✅ **${newTitle} atualizado com sucesso!**\n${review.summary}`,
+          text: `👀 **Dei uma vista de olhos na tua alteração em "${review.mealTitle}"!**\n\n` +
+            `📋 **Resumo da refeição:**\n${review.userDesc}\nHorário: ${review.mealTime}\n\n` +
+            `✅ **Está aprovado!** A tua refeição está equilibrada, nutritiva e alinhada com o plano de défice calórico.\n\nO teu plano alimentar foi atualizado com sucesso.`,
         },
       ]);
+
+      setActiveTab('chat');
     }
   };
 
@@ -133,9 +152,9 @@ export default function App() {
   const handleApplyAiSuggestion = (review) => {
     setMeals(prev => prev.map(m => m.id === review.mealId ? {
       ...m,
-      title: review.userEditedTitle.trim() || m.title,
+      title: review.mealTitle.trim() || m.title,
       desc: review.aiSuggestion,
-      time: review.userEditedTime || m.time,
+      time: review.mealTime || m.time,
     } : m));
 
     // Update in-chat review state if present
@@ -152,7 +171,9 @@ export default function App() {
       {
         id: `done-ai-${Date.now()}`,
         role: 'assistant',
-        text: `💡 **Opção da IA aplicada a "${review.userEditedTitle}":**\n${review.aiSuggestion}\n\nO teu plano alimentar foi atualizado com a recomendação ideal!`,
+        text: `💡 **Excelente escolha!** Atualizei a refeição **"${review.mealTitle}"** para a recomendação da IA:\n\n` +
+          `• **Nova composição:** ${review.aiSuggestion}\n\n` +
+          `O teu plano alimentar está agora 100% equilibrado e pronto a seguir.`,
       },
     ]);
 
@@ -163,9 +184,9 @@ export default function App() {
   const handleKeepUserChoice = (review) => {
     setMeals(prev => prev.map(m => m.id === review.mealId ? {
       ...m,
-      title: review.userEditedTitle.trim() || m.title,
-      desc: review.userEditedDesc,
-      time: review.userEditedTime || m.time,
+      title: review.mealTitle.trim() || m.title,
+      desc: review.userDesc,
+      time: review.mealTime || m.time,
     } : m));
 
     // Update in-chat review state if present
@@ -182,7 +203,9 @@ export default function App() {
       {
         id: `done-user-${Date.now()}`,
         role: 'assistant',
-        text: `✋ **Mantiveste a tua escolha para "${review.userEditedTitle}":**\n${review.userEditedDesc}\n\nO plano foi gravado exatamente como decidiste.`,
+        text: `✋ **Entendido!** Mantive a tua versão para **"${review.mealTitle}"**:\n\n` +
+          `• **Composição:** ${review.userDesc}\n\n` +
+          `O plano alimentar foi gravado exatamente como decidiste.`,
       },
     ]);
 
@@ -262,7 +285,7 @@ export default function App() {
         })}
       </nav>
 
-      {/* ── AI MEAL REVIEW MODAL (When an issue is detected) ── */}
+      {/* ── AI MEAL REVIEW MODAL (Popup option) ── */}
       {pendingReview && (
         <div className="review-modal-backdrop">
           <div className="review-modal-box">
@@ -270,23 +293,23 @@ export default function App() {
               <div className="review-icon-avatar">🤖</div>
               <div>
                 <div className="review-title-sub">Avaliação Nutricional da IA</div>
-                <div className="review-title-main">{pendingReview.userEditedTitle}</div>
+                <div className="review-title-main">{pendingReview.mealTitle}</div>
               </div>
             </div>
 
             <p className="review-summary-text">
-              Analisei a tua alteração e reparei num ponto que pode comprometer o teu défice ou energia.
+              Analisei a tua alteração e encontrei um ponto importante a considerar para o teu plano.
             </p>
 
             <div className="review-card-details">
               <div>
-                <div className="review-block-label user">A tua edição:</div>
-                <div className="review-block-text">{pendingReview.userEditedDesc}</div>
+                <div className="review-block-label user">A tua versão:</div>
+                <div className="review-block-text">{pendingReview.userDesc}</div>
               </div>
 
               <div>
-                <div className="review-block-label warning">⚠️ Alerta da IA:</div>
-                <div className="review-block-text">{pendingReview.explanation}</div>
+                <div className="review-block-label warning">⚠️ {pendingReview.issueTitle}:</div>
+                <div className="review-block-text">{pendingReview.issueExplanation}</div>
               </div>
 
               <div>
