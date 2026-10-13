@@ -3,7 +3,7 @@ import MealPlan from './componets/MealPlan';
 import ShoppingList from './componets/ShoppingList';
 import AiChat from './componets/AiChat';
 import { DEFAULT_MEALS } from './data/meals';
-import { evaluateMealWithAI } from './services/geminiService';
+import { evaluateMealWithAI, GEMINI_API_KEY } from './services/geminiService';
 
 /* ── SVG Tab Icons ── */
 const IconCalendar = ({ active }) => (
@@ -77,8 +77,8 @@ export default function App() {
   const [meals, setMeals] = useState(DEFAULT_MEALS);
   const [theme, setTheme] = useState('light');
 
-  // Gemini API Key from localStorage
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  // Gemini API Key directly embedded from code / .env
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || GEMINI_API_KEY);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [keyInput, setKeyInput] = useState('');
 
