@@ -126,7 +126,7 @@ function buildTimeDisplay(val, note) {
   return note.trim() ? `${val} · ${note.trim()}` : val;
 }
 
-export default function MealPlan({ meals, setMeals, onSaveMeal }) {
+export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) {
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editTimeVal, setEditTimeVal] = useState('09:00');
@@ -342,10 +342,10 @@ export default function MealPlan({ meals, setMeals, onSaveMeal }) {
 
                 {/* Edit Actions */}
                 <div className="edit-actions-row">
-                  <button className="btn-save" onClick={() => saveEdit(meal)}>
-                    🤖 Guardar & Rever com a IA
+                  <button className="btn-save" onClick={() => saveEdit(meal)} disabled={isEvaluating}>
+                    {isEvaluating ? '⏳ A analisar com IA...' : '🤖 Guardar & Rever com a IA'}
                   </button>
-                  <button className="btn-cancel" onClick={() => setEditingId(null)}>
+                  <button className="btn-cancel" onClick={() => setEditingId(null)} disabled={isEvaluating}>
                     Cancelar
                   </button>
                   <button

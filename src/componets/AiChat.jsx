@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { askAssistantAI } from '../services/geminiService';
 
 /* ══════════════════════════════════════════════════
    LOCAL ASSISTANT ENGINE
@@ -177,6 +178,7 @@ export default function AiChat({
   setMessages: externalSetMessages,
   onApplyAiSuggestion,
   onKeepUserChoice,
+  apiKey,
 }) {
   const [internalMessages, setInternalMessages] = useState([
     {
@@ -202,7 +204,7 @@ export default function AiChat({
     scrollToBottom();
   }, [messages, loading]);
 
-  const sendMessage = (textToSend) => {
+  const sendMessage = async (textToSend) => {
     const query = (textToSend || input).trim();
     if (!query || loading) return;
 
@@ -211,11 +213,21 @@ export default function AiChat({
     if (!textToSend) setInput('');
     setLoading(true);
 
-    setTimeout(() => {
-      const reply = generateResponse(query, meals);
+    try {
+      let reply = null;
+      if (apiKey) {
+        reply = await askAssistantAI({ prompt: query, meals, apiKey });
+      }
+      if (!reply) {
+        reply = generateResponse(query, meals);
+      }
       setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', text: reply }]);
+    } catch {
+      const fallback = generateResponse(query, meals);
+      setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', text: fallback }]);
+    } finally {
       setLoading(false);
-    }, 280);
+    }
   };
 
   const renderText = (txt) => {

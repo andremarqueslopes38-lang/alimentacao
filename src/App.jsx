@@ -3,7 +3,7 @@ import MealPlan from './componets/MealPlan';
 import ShoppingList from './componets/ShoppingList';
 import AiChat from './componets/AiChat';
 import { DEFAULT_MEALS } from './data/meals';
-import { analyzeMealEdit } from './utils/nutritionReviewer';
+import { evaluateMealWithAI } from './services/geminiService';
 
 /* ── SVG Tab Icons ── */
 const IconCalendar = ({ active }) => (
@@ -57,6 +57,15 @@ const MoonIcon = () => (
   </svg>
 );
 
+const KeyIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 2l-2 2m-1.5 1.5L14 9l-1.5-1.5L11 9l-1.5-1.5L8 9" />
+    <circle cx="7.5" cy="16.5" r="4.5" />
+    <path d="M10.5 13.5L19 5l2 2-8.5 8.5" />
+  </svg>
+);
+
 const TABS = [
   { id: 'plan',     label: 'Plano',     Icon: IconCalendar },
   { id: 'shopping', label: 'Compras',   Icon: IconCart },
@@ -68,17 +77,25 @@ export default function App() {
   const [meals, setMeals] = useState(DEFAULT_MEALS);
   const [theme, setTheme] = useState('light');
 
+  // Gemini API Key from localStorage
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+
+  // Evaluating / Loading state
+  const [isEvaluating, setIsEvaluating] = useState(false);
+
+  // Active Pending Review Modal
+  const [pendingReview, setPendingReview] = useState(null);
+
   // Shared Chat History
   const [messages, setMessages] = useState([
     {
       id: 'init-1',
       role: 'assistant',
-      text: 'Olá! 👋 Sou o teu assistente nutricional local. Estou a par do teu plano alimentar. Sempre que editares uma refeição, eu dou uma vista de olhos, faço um resumo detalhado e, caso note algum desequilíbrio, dou-te 2 opções para decidires!',
+      text: 'Olá! 👋 Sou o teu assistente nutricional local. Estou a par do teu plano alimentar. Sempre que editares uma refeição, dou uma vista de olhos, faço um resumo detalhado e, caso note algum desequilíbrio, dou-te 2 opções para decidires!',
     },
   ]);
-
-  // Active Pending Review Modal
-  const [pendingReview, setPendingReview] = useState(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -88,63 +105,75 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
+  const handleOpenSettings = () => {
+    setKeyInput(apiKey);
+    setIsSettingsOpen(true);
+  };
+
+  const handleSaveApiKey = () => {
+    const trimmed = keyInput.trim();
+    setApiKey(trimmed);
+    localStorage.setItem('gemini_api_key', trimmed);
+    setIsSettingsOpen(false);
+  };
+
+  const handleClearApiKey = () => {
+    setApiKey('');
+    setKeyInput('');
+    localStorage.removeItem('gemini_api_key');
+    setIsSettingsOpen(false);
+  };
+
   // Called when user clicks "Guardar" on any meal in MealPlan
-  const handleMealEdit = (meal, newDesc, newTitle, newTime) => {
-    const review = analyzeMealEdit(meal, newDesc, newTitle, newTime);
-    const reviewId = `rev-${Date.now()}`;
-    const reviewWithId = { ...review, id: reviewId };
+  const handleMealEdit = async (meal, newDesc, newTitle, newTime) => {
+    setIsEvaluating(true);
 
-    if (review.hasIssue) {
-      // 1. Temporarily save user's version in the plan pending choice
-      setMeals(prev => prev.map(m => m.id === meal.id ? {
-        ...m,
-        title: newTitle.trim() || m.title,
-        desc: newDesc || m.desc,
-        time: newTime || m.time,
-      } : m));
+    try {
+      const review = await evaluateMealWithAI({
+        meal,
+        newDesc,
+        newTitle,
+        newTime,
+        apiKey,
+      });
 
-      // 2. Add detailed review to Chat with the 2 choices
-      setMessages(prev => [
-        ...prev,
-        {
-          id: reviewId,
-          role: 'assistant',
-          type: 'meal_review',
-          review: reviewWithId,
-          status: 'pending',
-          text: `👀 **Dei uma vista de olhos na tua alteração em "${review.mealTitle}"!**\n\n` +
-            `📋 **Resumo da tua refeição:**\n${review.userDesc}\nHorário: ${review.mealTime}\n\n` +
-            `⚠️ **Alerta Nutricional — ${review.issueTitle}:**\n${review.issueExplanation}\n\n` +
-            `💡 **Sugestão Otimizada da IA:**\n${review.aiSuggestion}\n*(${review.prosAndCons})*\n\n` +
-            `O que preferes fazer? Escolhe uma das 2 opções abaixo:`,
-        },
-      ]);
+      const reviewId = `rev-${Date.now()}`;
+      const reviewWithId = { ...review, id: reviewId };
 
-      // 3. Set pending modal AND jump straight to the Chat tab so user sees the review!
+      // POP UP THE MODAL RIGHT ON THE CURRENT PAGE!
       setPendingReview(reviewWithId);
-      setActiveTab('chat');
-    } else {
-      // Meal is healthy and balanced — Save directly!
-      setMeals(prev => prev.map(m => m.id === meal.id ? {
-        ...m,
-        title: newTitle.trim() || m.title,
-        desc: newDesc || m.desc,
-        time: newTime || m.time,
-      } : m));
 
-      // Add positive summary to chat and jump to Chat
-      setMessages(prev => [
-        ...prev,
-        {
-          id: `ok-${Date.now()}`,
-          role: 'assistant',
-          text: `👀 **Dei uma vista de olhos na tua alteração em "${review.mealTitle}"!**\n\n` +
-            `📋 **Resumo da refeição:**\n${review.userDesc}\nHorário: ${review.mealTime}\n\n` +
-            `✅ **Está aprovado!** A tua refeição está equilibrada, nutritiva e alinhada com o plano de défice calórico.\n\nO teu plano alimentar foi atualizado com sucesso.`,
-        },
-      ]);
-
-      setActiveTab('chat');
+      // Also record event into Chat messages
+      if (review.hasIssue) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: reviewId,
+            role: 'assistant',
+            type: 'meal_review',
+            review: reviewWithId,
+            status: 'pending',
+            text: `👀 **Revisão da alteração em "${review.mealTitle}":**\n\n` +
+              `📋 **Resumo da tua refeição:**\n${review.userDesc}\nHorário: ${review.mealTime}\n\n` +
+              `⚠️ **Alerta Nutricional — ${review.issueTitle}:**\n${review.issueExplanation}\n\n` +
+              `💡 **Sugestão Otimizada da IA:**\n${review.aiSuggestion}\n\n` +
+              `Podes escolher fazer o que a IA recomenda ou manter como queres.`,
+          },
+        ]);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `ok-${Date.now()}`,
+            role: 'assistant',
+            text: `👀 **Revisão da alteração em "${review.mealTitle}":**\n\n` +
+              `📋 **Resumo da refeição:**\n${review.userDesc}\nHorário: ${review.mealTime}\n\n` +
+              `✅ **Aprovado!** A tua refeição está equilibrada e alinhada com o défice calórico.`,
+          },
+        ]);
+      }
+    } finally {
+      setIsEvaluating(false);
     }
   };
 
@@ -157,7 +186,6 @@ export default function App() {
       time: review.mealTime || m.time,
     } : m));
 
-    // Update in-chat review state if present
     setMessages(prev => prev.map(msg => {
       if (msg.review?.id === review.id) {
         return { ...msg, status: 'ai_accepted' };
@@ -165,15 +193,12 @@ export default function App() {
       return msg;
     }));
 
-    // Add confirmation to chat
     setMessages(prev => [
       ...prev,
       {
         id: `done-ai-${Date.now()}`,
         role: 'assistant',
-        text: `💡 **Excelente escolha!** Atualizei a refeição **"${review.mealTitle}"** para a recomendação da IA:\n\n` +
-          `• **Nova composição:** ${review.aiSuggestion}\n\n` +
-          `O teu plano alimentar está agora 100% equilibrado e pronto a seguir.`,
+        text: `💡 **Sugestão da IA aplicada a "${review.mealTitle}":**\n${review.aiSuggestion}`,
       },
     ]);
 
@@ -189,7 +214,6 @@ export default function App() {
       time: review.mealTime || m.time,
     } : m));
 
-    // Update in-chat review state if present
     setMessages(prev => prev.map(msg => {
       if (msg.review?.id === review.id) {
         return { ...msg, status: 'user_kept' };
@@ -197,15 +221,12 @@ export default function App() {
       return msg;
     }));
 
-    // Add confirmation to chat
     setMessages(prev => [
       ...prev,
       {
         id: `done-user-${Date.now()}`,
         role: 'assistant',
-        text: `✋ **Entendido!** Mantive a tua versão para **"${review.mealTitle}"**:\n\n` +
-          `• **Composição:** ${review.userDesc}\n\n` +
-          `O plano alimentar foi gravado exatamente como decidiste.`,
+        text: `✋ **Mantiveste a tua escolha para "${review.mealTitle}":**\n${review.userDesc}`,
       },
     ]);
 
@@ -225,11 +246,22 @@ export default function App() {
           <div className="schedule-pill">
             09:00 – 12:50
           </div>
+
+          <button
+            className="theme-toggle-btn"
+            onClick={handleOpenSettings}
+            aria-label="Definições da IA"
+            title={apiKey ? 'Modo Gemini Ativo' : 'Definir Chave Gemini (Opcional)'}
+            style={{ color: apiKey ? 'var(--primary)' : 'var(--text-sub)' }}
+          >
+            <KeyIcon />
+          </button>
+
           <button
             className="theme-toggle-btn"
             onClick={toggleTheme}
             aria-label="Alternar modo claro/escuro"
-            title={theme === 'light' ? 'Mudar para modo escuro' : 'Mudar para modo claro'}
+            title={theme === 'light' ? 'Modo escuro' : 'Modo claro'}
           >
             {theme === 'light' ? <MoonIcon /> : <SunIcon />}
           </button>
@@ -244,6 +276,7 @@ export default function App() {
               meals={meals}
               setMeals={setMeals}
               onSaveMeal={handleMealEdit}
+              isEvaluating={isEvaluating}
             />
           </div>
         )}
@@ -262,6 +295,7 @@ export default function App() {
               setMessages={setMessages}
               onApplyAiSuggestion={handleApplyAiSuggestion}
               onKeepUserChoice={handleKeepUserChoice}
+              apiKey={apiKey}
             />
           </div>
         )}
@@ -285,21 +319,37 @@ export default function App() {
         })}
       </nav>
 
-      {/* ── AI MEAL REVIEW MODAL (Popup option) ── */}
-      {pendingReview && (
+      {/* ── AI EVALUATING OVERLAY ── */}
+      {isEvaluating && (
+        <div className="review-modal-backdrop">
+          <div className="review-modal-box" style={{ textAlign: 'center', padding: '30px 20px' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>🤖✨</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: 6 }}>
+              A IA está a analisar a tua refeição...
+            </div>
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-sub)' }}>
+              {apiKey ? 'A consultar Google Gemini 2.5 Flash' : 'A avaliar calorias, açúcares e equilíbrio'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI MEAL REVIEW MODAL (POP-UP NA PÁGINA ONDE ESTÁS) ── */}
+      {pendingReview && !isEvaluating && (
         <div className="review-modal-backdrop">
           <div className="review-modal-box">
             <div className="review-modal-header">
               <div className="review-icon-avatar">🤖</div>
-              <div>
-                <div className="review-title-sub">Avaliação Nutricional da IA</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span className="review-title-sub">Avaliação Nutricional</span>
+                  <span className={`api-badge ${pendingReview.source === 'gemini' ? 'gemini' : 'local'}`}>
+                    {pendingReview.source === 'gemini' ? 'Google Gemini' : 'IA Local'}
+                  </span>
+                </div>
                 <div className="review-title-main">{pendingReview.mealTitle}</div>
               </div>
             </div>
-
-            <p className="review-summary-text">
-              Analisei a tua alteração e encontrei um ponto importante a considerar para o teu plano.
-            </p>
 
             <div className="review-card-details">
               <div>
@@ -307,33 +357,97 @@ export default function App() {
                 <div className="review-block-text">{pendingReview.userDesc}</div>
               </div>
 
-              <div>
-                <div className="review-block-label warning">⚠️ {pendingReview.issueTitle}:</div>
-                <div className="review-block-text">{pendingReview.issueExplanation}</div>
-              </div>
+              {pendingReview.hasIssue ? (
+                <>
+                  <div>
+                    <div className="review-block-label warning">⚠️ {pendingReview.issueTitle}:</div>
+                    <div className="review-block-text">{pendingReview.issueExplanation}</div>
+                  </div>
 
-              <div>
-                <div className="review-block-label ai">💡 Sugestão da IA:</div>
-                <div className="review-block-text" style={{ fontWeight: 600 }}>
-                  {pendingReview.aiSuggestion}
+                  <div>
+                    <div className="review-block-label ai">💡 Sugestão Otimizada da IA:</div>
+                    <div className="review-block-text" style={{ fontWeight: 600 }}>
+                      {pendingReview.aiSuggestion}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <div className="review-block-label ai">✅ Refeição Aprovada:</div>
+                  <div className="review-block-text">{pendingReview.issueExplanation}</div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* The 2 options requested by the user */}
             <div className="review-choices-container">
-              <button
-                className="review-btn-ai"
-                onClick={() => handleApplyAiSuggestion(pendingReview)}
-              >
-                💡 Fazer o que a IA acha melhor
-              </button>
+              {pendingReview.hasIssue ? (
+                <>
+                  <button
+                    className="review-btn-ai"
+                    onClick={() => handleApplyAiSuggestion(pendingReview)}
+                  >
+                    💡 Fazer o que a IA acha melhor
+                  </button>
 
-              <button
-                className="review-btn-user"
-                onClick={() => handleKeepUserChoice(pendingReview)}
-              >
-                ✋ Deixar como eu quero
+                  <button
+                    className="review-btn-user"
+                    onClick={() => handleKeepUserChoice(pendingReview)}
+                  >
+                    ✋ Deixar como eu quero
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="review-btn-ai"
+                  onClick={() => handleKeepUserChoice(pendingReview)}
+                >
+                  Confirmar e Guardar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SETTINGS MODAL (GEMINI API KEY) ── */}
+      {isSettingsOpen && (
+        <div className="review-modal-backdrop" onClick={() => setIsSettingsOpen(false)}>
+          <div className="review-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="review-modal-header">
+              <div className="review-icon-avatar">🔑</div>
+              <div>
+                <div className="review-title-sub">Configuração de IA</div>
+                <div className="review-title-main">Chave Gemini (Opcional)</div>
+              </div>
+            </div>
+
+            <p className="review-summary-text" style={{ marginBottom: 12 }}>
+              Insere a tua chave do <strong>Google AI Studio</strong> para ativar a IA do Gemini.
+              Se deixares vazio, a app funciona 100% gratuita no <strong>modo local</strong> (ideal para os teus amigos usarem sem chave).
+            </p>
+
+            <div style={{ marginBottom: 14 }}>
+              <input
+                type="password"
+                className="input-box"
+                placeholder="Cola aqui a tua chave da Gemini (AIzaSy...)"
+                value={keyInput}
+                onChange={e => setKeyInput(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
+              <button className="review-btn-ai" onClick={handleSaveApiKey}>
+                Guardar Chave
+              </button>
+              {apiKey && (
+                <button className="review-btn-user" onClick={handleClearApiKey} style={{ color: 'var(--accent-red)' }}>
+                  Remover Chave (Voltar ao Modo Gratuito)
+                </button>
+              )}
+              <button className="btn-cancel" onClick={() => setIsSettingsOpen(false)} style={{ textAlign: 'center' }}>
+                Fechar
               </button>
             </div>
           </div>

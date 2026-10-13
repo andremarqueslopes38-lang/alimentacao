@@ -1072,19 +1072,19 @@ input, select, textarea {
    AI MEAL REVIEW MODAL & IN-CHAT DECISION CARDS
 ═══════════════════════════════════════════════ */
 .review-modal-backdrop {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  z-index: 50;
-  padding: 12px;
+  z-index: 999;
+  padding: 16px;
   animation: fadeIn 0.2s ease;
 }
 
@@ -1099,14 +1099,35 @@ input, select, textarea {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 24px;
-  padding: 20px 18px;
-  box-shadow: var(--shadow-lg);
-  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 22px 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  animation: scaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes scaleUp {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.api-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+.api-badge.gemini {
+  background-color: #E0E7FF;
+  color: #3730A3;
+}
+
+.api-badge.local {
+  background-color: var(--primary-light);
+  color: var(--primary-text);
 }
 
 .review-modal-header {
