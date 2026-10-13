@@ -23,6 +23,13 @@ const INITIAL_CATEGORIES = [
   }
 ];
 
+const CheckmarkIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
 export default function ShoppingList() {
   const [checkedItems, setCheckedItems] = useState({});
 
@@ -30,116 +37,89 @@ export default function ShoppingList() {
     setCheckedItems(prev => ({ ...prev, [item]: !prev[item] }));
   };
 
+  const clearAll = () => {
+    setCheckedItems({});
+  };
+
   const allItems = INITIAL_CATEGORIES.flatMap(c => c.items);
   const totalItems  = allItems.length;
   const checkedCount = allItems.filter(item => !!checkedItems[item]).length;
   const progress = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0;
+  const isComplete = totalItems > 0 && checkedCount === totalItems;
 
   return (
-    <div className="space-y-5">
+    <div className="page-section">
       {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title">Lista de Compras</h1>
-        <p className="page-subtitle">Abastecimento semanal do teu plano alimentar</p>
-      </div>
+      <div className="section-header">Compras</div>
+      <div className="section-sub">Abastecimento semanal para o teu plano</div>
 
-      {/* Progress Banner */}
-      <div className="banner" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Progress Card */}
+      <div className="stat-card">
+        <div className="stat-row">
           <div>
-            <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-primary)', marginBottom: 3 }}>
-              Progresso Semanal
+            <div className="stat-label">Itens no Carrinho</div>
+            <div className={`stat-value${isComplete ? ' done' : ''}`}>
+              {checkedCount}/{totalItems}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-bright)', letterSpacing: '-0.02em' }}>
-              {checkedCount} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>/ {totalItems} itens</span>
+            <div className="stat-caption">
+              {isComplete ? 'Tudo pronto para a semana!' : 'Itens marcados no supermercado'}
             </div>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{
-              fontSize: '1.5rem', fontWeight: 800,
-              color: checkedCount === totalItems ? 'var(--color-primary)' : 'var(--color-text-bright)'
-            }}>
-              {progress}%
-            </span>
-            {checkedCount > 0 && (
-              <button
-                className="btn btn-ghost"
-                style={{ fontSize: '0.75rem', padding: '5px 12px' }}
-                onClick={() => setCheckedItems({})}
-              >
-                Limpar
-              </button>
-            )}
+          <div style={{ textAlign: 'right' }}>
+            <div className="stat-label">Progresso</div>
+            <div className={`stat-value${isComplete ? ' done' : ''}`}>{progress}%</div>
           </div>
         </div>
 
-        <div className="progress-bar-track">
-          <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
+
+        {checkedCount > 0 && (
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn-ghost" onClick={clearAll} style={{ fontSize: '0.78rem' }}>
+              Limpar seleções
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Category Sections */}
-      <div className="space-y-4">
-        {INITIAL_CATEGORIES.map((cat, idx) => {
-          const catChecked = cat.items.filter(item => !!checkedItems[item]).length;
-          return (
-            <div key={idx} className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: '1.1rem' }}>{cat.icon}</span>
-                <h4 style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.07em',
-                  color: 'var(--color-primary)',
-                }}>
-                  {cat.name}
-                </h4>
-                <span className="badge badge-slate" style={{ marginLeft: 'auto' }}>
-                  {catChecked}/{cat.items.length}
-                </span>
-              </div>
+      {/* Categories */}
+      {INITIAL_CATEGORIES.map((cat, idx) => (
+        <div key={idx} style={{ marginBottom: 14 }}>
+          <div className="shop-section-label">
+            {cat.icon} {cat.name}
+          </div>
+          <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-1)' }}>
+            {cat.items.map(item => {
+              const isChecked = !!checkedItems[item];
+              return (
+                <div
+                  key={item}
+                  className={`shop-row${isChecked ? ' checked' : ''}`}
+                  onClick={() => toggleItem(item)}
+                >
+                  <div className={`shop-check${isChecked ? ' checked' : ''}`}>
+                    {isChecked && <CheckmarkIcon />}
+                  </div>
+                  <span className="shop-row-text">{item}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
-              <div className="space-y-2">
-                {cat.items.map((item, i) => {
-                  const isChecked = !!checkedItems[item];
-                  return (
-                    <div
-                      key={i}
-                      id={`shop-item-${idx}-${i}`}
-                      className={`shop-item ${isChecked ? 'checked' : ''}`}
-                      onClick={() => toggleItem(item)}
-                      role="checkbox"
-                      aria-checked={isChecked}
-                      tabIndex={0}
-                      onKeyDown={e => e.key === ' ' && toggleItem(item)}
-                    >
-                      <div className="shop-checkbox">
-                        <span className="shop-checkbox-inner">✓</span>
-                      </div>
-                      <span className="shop-item-text">{item}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Completion */}
-      {checkedCount === totalItems && (
-        <div style={{
-          textAlign: 'center',
-          padding: '24px',
-          background: 'rgba(108,191,126,0.07)',
-          border: '1px solid rgba(108,191,126,0.18)',
-          borderRadius: 'var(--radius-lg)',
-        }}>
-          <div style={{ fontSize: '2rem', marginBottom: 8 }}>🎉</div>
-          <div style={{ fontWeight: 700, color: 'var(--color-primary)', marginBottom: 4 }}>Lista completa!</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Estás preparado para a semana</div>
+      {/* Celebration card if complete */}
+      {isComplete && (
+        <div className="stat-card" style={{ textAlign: 'center', padding: '24px 16px', marginTop: 10 }}>
+          <div style={{ fontSize: '2rem', marginBottom: 8 }}>🛒✨</div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--label)', marginBottom: 4 }}>
+            Carrinho Completo!
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--label-2)' }}>
+            Tens todos os alimentos necessários para seguir o teu plano alimentar à risca.
+          </p>
         </div>
       )}
     </div>
