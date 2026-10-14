@@ -1,6 +1,8 @@
 /* ══════════════════════════════════════════════════
    REAL GOOGLE GEMINI NUTRITION ENGINE
    Full conversational LLM powered by Google Gemini API
+   Analyzes meals in context of the entire daily plan
+   and respects the user's specific food cravings.
 ══════════════════════════════════════════════════ */
 
 import { analyzeMealEdit } from '../utils/nutritionReviewer.js';
@@ -17,39 +19,59 @@ const CANDIDATE_MODELS = [
   'gemini-3.5-flash',
 ];
 
-/** Evaluates an edited meal using Google Gemini */
+export function getActiveApiKey(customKey) {
+  if (customKey && customKey.trim()) return customKey.trim();
+  const stored = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
+  if (stored && stored.trim()) return stored.trim();
+  return GEMINI_API_KEY;
+}
+
+/** Evaluates an edited meal using Google Gemini taking the entire daily plan into account */
 export async function evaluateMealWithAI({
   meal,
   newDesc,
   newTitle,
   newTime,
+  allMeals,
   apiKey,
 }) {
-  const key = (apiKey || GEMINI_API_KEY).trim();
+  const key = getActiveApiKey(apiKey);
 
-  const prompt = `És um nutricionista desportivo experiente, humano, honesto e focado em défice calórico saudável para alguém em teletrabalho (09:00 - 12:50).
-O utilizador alterou uma refeição do seu plano alimentar:
-- Refeição: ${newTitle || meal?.title}
-- Horário: ${newTime || meal?.time}
-- O que o utilizador escreveu que vai comer: "${newDesc}"
+  const planSummary = (allMeals || [])
+    .map(m => `- ${m.title} (${m.time}): ${m.desc}`)
+    .join('\n');
 
-A tua tarefa:
-1. Analisa como um nutricionista real. Dá a tua opinião sincera.
-2. Se houver excesso evidente de açúcar (ex: mel em quantidade, doces, bolos), quantidades absurdas (ex: 90 unidades de qualquer coisa), gorduras pesadas/fritos, ou hidratos densos à noite no jantar (arroz/massa/batata que prejudicam o sono e défice), deves marcar "hasIssue": true!
-3. Se "hasIssue" for true:
-   - "issueTitle": Nome curto e chamativo do problema (ex: Sobrecarga extrema de açúcar, Falta de proteína, etc.)
-   - "issueExplanation": A tua opinião real e direta em 2 frases explicando por que é prejudicial para o défice calórico ou energia.
-   - "aiSuggestion": A tua sugestão concreta, saborosa e equilibrada de alimentos alternativos (com medidas realistas).
-4. Se a refeição for boa e saudável, marca "hasIssue": false com uma opinião encorajadora e realista.
+  const prompt = `És um nutricionista desportivo inteligente, empático, prático e focado em défice calórico saudável para teletrabalho (turno das 09:00 às 12:50).
 
-Responde OBRIGATORIAMENTE em JSON puro (sem markdown \`\`\`):
+O utilizador tem este plano alimentar diário completo:
+${planSummary}
+
+O utilizador está a alterar especificamente a refeição: "${newTitle || meal?.title}" (${newTime || meal?.time})
+- Composição original desta refeição: "${meal?.desc || ''}"
+- O que o utilizador quer comer agora: "${newDesc}"
+
+REGRAS OBRIGATÓRIAS DE ANÁLISE:
+1. RESPEITA O DESEJO DO UTILIZADOR: Se o utilizador quer comer um alimento específico (por exemplo: mel, chocolate, queijo, pão, fruta, etc.), NUNCA substituas a refeição por algo completamente diferente sem esse alimento (ex: se ele pediu mel, não inventes que ele tem de comer aveia ou legumes em vez de mel).
+   - Mantém o alimento que o utilizador escolheu!
+   - Se a quantidade for exagerada (ex: 90 unidades de mel, 50 colheres, excesso evidente de calorias), AJUSTA A DOSE para uma quantidade saudável e realista (ex: 1 colher de chá ou 1 colher de sopa de mel) e combina com a base da refeição (ex: manter a proteína habitual como os ovos para dar saciedade).
+
+2. VISÃO GLOBAL DO PLANO COMPLETO DO DIA:
+   - Analisa como esta refeição se adequa ao dia todo (défice calórico de ~1800 kcal, energia para o turno de trabalho das 09:00 às 12:50, almoço e jantar leve).
+   - Explica na "issueExplanation" ou "prosAndCons" como o ajuste se adequa ao resto do dia (ex: um pouco de mel de manhã fornece energia rápida para iniciar o turno de teletrabalho, e como o jantar é leve sem hidratos densos, o défice diário mantém-se perfeitamente protegido).
+
+3. CRITÉRIOS DE "hasIssue":
+   - Se houver doses absurdas/exageradas (ex: 90 unidades), excesso prejudicial de gorduras/frituras, ou hidratos pesados à noite no jantar: "hasIssue": true.
+   - Na "aiSuggestion": Mantém o alimento desejado mas com a porção correta e equilibrada com a refeição.
+   - Se o que ele escreveu já for equilibrado e realista: "hasIssue": false.
+
+Responde ESTRITAMENTE em formato JSON puro (sem blocos markdown):
 {
   "hasIssue": true ou false,
-  "issueTitle": "Título do problema ou vazio se estiver bem",
-  "issueExplanation": "A tua opinião sincera como nutricionista",
-  "aiSuggestion": "Receita ou sugestão equilibrada da IA",
-  "prosAndCons": "Por que a tua sugestão funciona melhor",
-  "summary": "Resumo rápido do que o utilizador colocou"
+  "issueTitle": "Título curto do alerta",
+  "issueExplanation": "A tua opinião sincera tendo em conta o plano diário completo",
+  "aiSuggestion": "A versão mantendo o que o utilizador quer mas com a dose adequada (ex: 2 Ovos Mexidos + 1 c. chá de Mel)",
+  "prosAndCons": "Por que esta opção respeita a vontade dele e se adequa ao dia todo",
+  "summary": "Resumo dos alimentos inseridos"
 }`;
 
   for (const model of CANDIDATE_MODELS) {
@@ -61,7 +83,7 @@ Responde OBRIGATORIAMENTE em JSON puro (sem markdown \`\`\`):
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.2,
+            temperature: 0.1,
             responseMimeType: 'application/json',
           },
         }),
@@ -82,10 +104,10 @@ Responde OBRIGATORIAMENTE em JSON puro (sem markdown \`\`\`):
         mealTime: newTime || meal.time,
         userDesc: newDesc,
         hasIssue: Boolean(parsed.hasIssue),
-        issueTitle: parsed.issueTitle || 'Ajuste Nutricional',
-        issueExplanation: parsed.issueExplanation || 'Opinião do nutricionista sobre a refeição.',
-        aiSuggestion: parsed.aiSuggestion || 'Opção equilibrada com proteína e vegetais.',
-        prosAndCons: parsed.prosAndCons || 'Melhora a saciedade e défice.',
+        issueTitle: parsed.issueTitle || 'Ajuste de Quantidade',
+        issueExplanation: parsed.issueExplanation || 'Opinião do nutricionista tendo em conta o plano diário.',
+        aiSuggestion: parsed.aiSuggestion || newDesc,
+        prosAndCons: parsed.prosAndCons || 'Equilibra o teu desejo com o défice calórico diário.',
         summary: parsed.summary || newDesc,
       };
     } catch (e) {
@@ -94,7 +116,7 @@ Responde OBRIGATORIAMENTE em JSON puro (sem markdown \`\`\`):
   }
 
   // Fallback to local analysis if network/API limits spike
-  const localResult = analyzeMealEdit(meal, newDesc, newTitle, newTime);
+  const localResult = analyzeMealEdit(meal, newDesc, newTitle, newTime, allMeals);
   return {
     source: 'local_fallback',
     ...localResult,
@@ -103,7 +125,7 @@ Responde OBRIGATORIAMENTE em JSON puro (sem markdown \`\`\`):
 
 /** Full conversational response from Google Gemini */
 export async function askAssistantAI({ prompt, meals, apiKey }) {
-  const key = (apiKey || GEMINI_API_KEY).trim();
+  const key = getActiveApiKey(apiKey);
 
   const planContext = (meals || [])
     .map(m => `• ${m.title} (${m.time}): ${m.desc}`)
@@ -117,9 +139,10 @@ Objetivo: Défice calórico moderado, manter energia alta durante o turno, sacie
 
 Instruções para responderes:
 1. Responde a QUALQUER pergunta do utilizador com inteligência, honestidade e utilidade real (como um nutricionista de topo ou um amigo especialista).
-2. Se te fizerem perguntas óbvias (ex: "posso comer pizza?", "comer 90 mel faz mal?", "o que como se tiver fome às 11h?"), sê direto, responde com clareza, dá a tua opinião real, sem rodeios e sem respostas genéricas pré-feitas.
+2. Se te fizerem perguntas diretas (ex: "posso comer mel?", "90 mel faz mal?", "o que como se tiver fome às 11h?"), sê direto, responde com clareza, dá a tua opinião real sem rodeios.
 3. Dá conselhos práticos, quantidades em medidas do dia a dia (colheres, palmas da mão, punhos) e dicas gastronómicas saborosas.
-4. Usa formatação limpa com marcadores e negrito (**assim**) para ser super fácil de ler no telemóvel.
+4. Tem sempre em conta o plano do dia todo para avaliar se o alimento encaixa ou não no défice.
+5. Usa formatação limpa com marcadores e negrito (**assim**) para ser super fácil de ler no telemóvel.
 
 Pergunta do utilizador:
 "${prompt}"`;

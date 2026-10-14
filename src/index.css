@@ -1290,3 +1290,204 @@ input, select, textarea {
   color: var(--text-sub);
   border: 1px solid var(--border);
 }
+
+/* ═══════════════════════════════════════════════
+   CALORIE TRACKER & COUNTER WIDGETS
+═══════════════════════════════════════════════ */
+.calorie-summary-card {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-surface-2) 100%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.calorie-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.calorie-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.calorie-card-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.cal-current {
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.cal-target {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.cal-status-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-badge-optimal {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="dark"] .cal-badge-optimal {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.cal-badge-under {
+  background-color: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.3);
+}
+
+[data-theme="dark"] .cal-badge-under {
+  background-color: rgba(2, 132, 199, 0.2);
+  color: #38bdf8;
+}
+
+.cal-badge-mild {
+  background-color: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="dark"] .cal-badge-mild {
+  background-color: rgba(217, 119, 6, 0.2);
+  color: #fbbf24;
+}
+
+.cal-badge-high {
+  background-color: rgba(225, 29, 72, 0.12);
+  color: #e11d48;
+  border: 1px solid rgba(225, 29, 72, 0.3);
+}
+
+[data-theme="dark"] .cal-badge-high {
+  background-color: rgba(225, 29, 72, 0.2);
+  color: #fb7185;
+}
+
+.calorie-bar-track {
+  height: 8px;
+  background-color: var(--bg-surface-3);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.calorie-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.calorie-bar-fill.cal-badge-optimal {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
+.calorie-bar-fill.cal-badge-under {
+  background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
+}
+
+.calorie-bar-fill.cal-badge-mild {
+  background: linear-gradient(90deg, #d97706 0%, #f59e0b 100%);
+}
+
+.calorie-bar-fill.cal-badge-high {
+  background: linear-gradient(90deg, #e11d48 0%, #f43f5e 100%);
+}
+
+.calorie-sub-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+
+.cal-sub-item strong {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.calorie-footer-msg {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+/* Individual Meal Calorie Pill */
+.meal-calorie-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background-color: var(--bg-surface-3);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Live Calorie indicator in edit form */
+.edit-calorie-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  background-color: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--text-main);
+  margin-bottom: 12px;
+}
+
+.edit-calorie-indicator strong {
+  color: var(--primary);
+  font-size: 0.95rem;
+}
+
+.cal-warning-inline {
+  font-size: 0.74rem;
+  color: #e11d48;
+  font-weight: 700;
+}
+

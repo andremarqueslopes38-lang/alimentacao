@@ -47,13 +47,14 @@ export function analyzeMealEdit(meal, newDesc, newTitle, newTime) {
     hasIssue = true;
     issueTitle = `Quantidade extrema detectada (${maxNumber} unidades)`;
     if (d.includes('mel')) {
-      issueExplanation = `Uma quantidade de ${maxNumber} unidades de mel representa centenas de gramas de puro açúcar! Isso vai causar uma sobrecarga calórica enorme, travar o défice e disparar os níveis de glicémia.`;
-      aiSuggestion = '1 c. chá de Mel (dose moderada) + 1 Iogurte Natural / Skyr + Canela';
-      prosAndCons = 'Troca uma sobrecarga de açúcar por uma dose pequena de mel combinada com proteína saciante.';
+      issueExplanation = `Comer ${maxNumber} unidades de mel é um excesso drástico de açúcar simples que arruinaria o teu défice calórico diário de ~1800 kcal.`;
+      const baseMeal = (meal?.desc && !meal.desc.includes('90')) ? meal.desc : '2 Ovos Mexidos';
+      aiSuggestion = `${baseMeal} + 1 c. chá de Mel`;
+      prosAndCons = 'Manténs o mel que queres comer, mas a dose controlada de 1 colher de chá (~30 kcal) dá energia rápida para o teu turno de trabalho sem comprometer o défice diário.';
     } else {
-      issueExplanation = `Uma quantidade de ${maxNumber} unidades/doses ultrapassa em larga escala as necessidades energéticas de uma refeição saudável e vai sabotar o défice calórico.`;
-      aiSuggestion = rawDesc.replace(/\b\d+(\.\d+)?\b/g, '1') + ' (dose normal de 1 porção controlada)';
-      prosAndCons = 'Reduz drasticamente o excesso calórico desnecessário.';
+      issueExplanation = `Uma quantidade de ${maxNumber} unidades/doses ultrapassa em larga escala as necessidades de uma refeição equilibrada.`;
+      aiSuggestion = rawDesc.replace(/\b\d+(\.\d+)?\b/g, '1') + ' (dose normal de 1 porção)';
+      prosAndCons = 'Mantém o alimento que escolheste mas com a porção certa para o dia todo.';
     }
   }
 
@@ -61,16 +62,18 @@ export function analyzeMealEdit(meal, newDesc, newTitle, newTime) {
   else if (foundSugar) {
     hasIssue = true;
     const foodName = foundSugar === 'mel' ? 'Mel' : foundSugar;
-    issueTitle = `Açúcar concentrado / Alimento glicémico (${foodName})`;
+    issueTitle = `Açúcar concentrado (${foodName})`;
 
     if (foundSugar === 'mel') {
-      issueExplanation = 'O mel é composto quase exclusivamente por frutose e glicose livres. Mesmo sendo natural, em quantidade elevada gera um pico violento de insulina que bloqueia a queima de gordura e abre o apetite pouco tempo depois.';
-      aiSuggestion = '1 Iogurte Natural ou Skyr + Canela em pó + 1 c. chá de Mel (apenas se necessário)';
+      issueExplanation = 'O mel é fonte de hidratos simples. Para encaixar no teu plano diário sem picos de glicémia, a porção deve ser moderada (1 colher de chá).';
+      const baseMeal = (meal?.desc && !meal.desc.includes('mel')) ? meal.desc : '1 Iogurte Natural / Skyr';
+      aiSuggestion = `${baseMeal} + 1 c. chá de Mel`;
+      prosAndCons = 'Manténs o mel na refeição mas na dose exata para dar energia rápida antes do turno de trabalho.';
     } else {
-      issueExplanation = `O alimento "${foodName}" tem densidade calórica e glicémica elevada sem fornecer saciedade duradoura, prejudicando o plano de emagrecimento.`;
-      aiSuggestion = '1 Iogurte Proteico + 1 Fruta fresca (Maçã/Frutos Vermelhos) com canela';
+      issueExplanation = `O alimento "${foodName}" tem densidade calórica e glicémica elevada sem fornecer saciedade duradoura.`;
+      aiSuggestion = `${rawDesc} (dose pequena) + 1 Fonte de Proteína para saciedade`;
+      prosAndCons = 'Permite matar a vontade sem descarrilar o plano diário.';
     }
-    prosAndCons = 'Controla os picos de insulina e mantém o metabolismo focado na oxidação lipídica.';
   }
 
   // ── 3. High Quantity (> 15) for Spoons/Units ──

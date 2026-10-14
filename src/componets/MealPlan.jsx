@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import { DEFAULT_MEALS } from '../data/meals';
+import {
+  calculateTotalCalories,
+  calculateConsumedCalories,
+  estimateMealCalories,
+  getCalorieStatus,
+  DAILY_CALORIE_TARGET,
+} from '../utils/calorieCalculator.js';
 
 /* ── SVG Icons ── */
 const PencilIcon = () => (
@@ -140,6 +147,11 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
   const doneCount = Object.values(doneMeals).filter(Boolean).length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
+  // Calorie calculations
+  const totalCalories = calculateTotalCalories(meals);
+  const consumedCalories = calculateConsumedCalories(meals, doneMeals);
+  const calStatus = getCalorieStatus(totalCalories, DAILY_CALORIE_TARGET);
+
   const toggleDone = (id) => {
     setDoneMeals(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -199,6 +211,44 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
       <div className="page-title-row">
         <h1 className="page-title">Plano Alimentar</h1>
         <p className="page-subtitle">Turno de trabalho das 09:00 às 12:50</p>
+      </div>
+
+      {/* Calorie Counter Card */}
+      <div className="calorie-summary-card">
+        <div className="calorie-card-header">
+          <div>
+            <div className="calorie-card-label">🔥 Contador Diário de Calorias</div>
+            <div className="calorie-card-main">
+              <span className="cal-current">{totalCalories.toLocaleString('pt-PT')}</span>
+              <span className="cal-target"> / {DAILY_CALORIE_TARGET} kcal</span>
+            </div>
+          </div>
+          <div className={`cal-status-pill ${calStatus.badgeClass}`}>
+            {calStatus.label}
+          </div>
+        </div>
+
+        <div className="calorie-bar-track">
+          <div
+            className={`calorie-bar-fill ${calStatus.badgeClass}`}
+            style={{ width: `${Math.min(100, Math.round((totalCalories / DAILY_CALORIE_TARGET) * 100))}%` }}
+          />
+        </div>
+
+        <div className="calorie-sub-stats">
+          <div className="cal-sub-item">
+            <span>Consumidas: </span>
+            <strong>{consumedCalories} kcal</strong> {doneCount > 0 && `(${doneCount} ${doneCount === 1 ? 'refeição' : 'refeições'})`}
+          </div>
+          <div className="cal-sub-item">
+            <span>Restantes: </span>
+            <strong>{Math.max(0, totalCalories - consumedCalories)} kcal</strong>
+          </div>
+        </div>
+
+        <div className="calorie-footer-msg">
+          {calStatus.message}
+        </div>
       </div>
 
       {/* Progress Card */}
@@ -335,6 +385,14 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                     </div>
                   )}
 
+                  {/* Live Calorie Estimator in Edit Form */}
+                  <div className="edit-calorie-indicator">
+                    <span>🔥 Calorias estimadas: <strong>~{estimateMealCalories(buildDesc(ings) || meal.desc)} kcal</strong></span>
+                    {estimateMealCalories(buildDesc(ings) || meal.desc) > 850 && (
+                      <span className="cal-warning-inline">⚠️ Quantidade ou calorias muito elevadas</span>
+                    )}
+                  </div>
+
                   <button className="add-row-btn" onClick={addIng}>
                     <PlusIcon /> Adicionar Ingrediente
                   </button>
@@ -360,6 +418,8 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
             );
           }
 
+          const mealCalories = estimateMealCalories(meal, meal.calories);
+
           return (
             <div key={meal.id} className={`meal-card-item${isDone ? ' done' : ''}`}>
               <div className="meal-card-layout">
@@ -374,6 +434,9 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                 <div className="meal-info">
                   <div className="meal-top-meta">
                     <span className={`time-tag ${meal.period}`}>{meal.time}</span>
+                    <span className="meal-calorie-pill" title="Calorias estimadas">
+                      🔥 ~{mealCalories} kcal
+                    </span>
                     {isDone && <span className="done-badge">Feito</span>}
                     <span className={`badge-pill ${BADGE_MAP[meal.badgeType] || 'slate'}`}>
                       {meal.badge}

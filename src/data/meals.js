@@ -10,6 +10,7 @@ export const DEFAULT_MEALS = [
     badgeType: 'badge-green',
     icon: '🥚',
     swapNote: 'Pode ser trocado pelo Lanche da Manhã',
+    calories: 280,
   },
   {
     id: 'lm',
@@ -21,6 +22,7 @@ export const DEFAULT_MEALS = [
     badgeType: 'badge-amber',
     icon: '🥛',
     swapNote: 'Pode ser trocado pelo Pequeno-Almoço',
+    calories: 210,
   },
   {
     id: 'alm',
@@ -32,6 +34,7 @@ export const DEFAULT_MEALS = [
     badgeType: 'badge-slate',
     icon: '🍽️',
     swapNote: 'Ajustar quantidades pela mão — sem balança',
+    calories: 620,
   },
   {
     id: 'lt',
@@ -43,6 +46,7 @@ export const DEFAULT_MEALS = [
     badgeType: 'badge-slate',
     icon: '🥤',
     swapNote: null,
+    calories: 220,
   },
   {
     id: 'jan',
@@ -54,5 +58,6 @@ export const DEFAULT_MEALS = [
     badgeType: 'badge-amber',
     icon: '🥗',
     swapNote: 'Otimiza o descanso noturno',
+    calories: 420,
   },
 ];

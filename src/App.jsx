@@ -57,15 +57,6 @@ const MoonIcon = () => (
   </svg>
 );
 
-const KeyIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 2l-2 2m-1.5 1.5L14 9l-1.5-1.5L11 9l-1.5-1.5L8 9" />
-    <circle cx="7.5" cy="16.5" r="4.5" />
-    <path d="M10.5 13.5L19 5l2 2-8.5 8.5" />
-  </svg>
-);
-
 const TABS = [
   { id: 'plan',     label: 'Plano',     Icon: IconCalendar },
   { id: 'shopping', label: 'Compras',   Icon: IconCart },
@@ -78,9 +69,7 @@ export default function App() {
   const [theme, setTheme] = useState('light');
 
   // Gemini API Key directly embedded from code / .env
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || GEMINI_API_KEY);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [keyInput, setKeyInput] = useState('');
+  const [apiKey] = useState(() => localStorage.getItem('gemini_api_key') || GEMINI_API_KEY);
 
   // Evaluating / Loading state
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -105,25 +94,6 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const handleOpenSettings = () => {
-    setKeyInput(apiKey);
-    setIsSettingsOpen(true);
-  };
-
-  const handleSaveApiKey = () => {
-    const trimmed = keyInput.trim();
-    setApiKey(trimmed);
-    localStorage.setItem('gemini_api_key', trimmed);
-    setIsSettingsOpen(false);
-  };
-
-  const handleClearApiKey = () => {
-    setApiKey('');
-    setKeyInput('');
-    localStorage.removeItem('gemini_api_key');
-    setIsSettingsOpen(false);
-  };
-
   // Called when user clicks "Guardar" on any meal in MealPlan
   const handleMealEdit = async (meal, newDesc, newTitle, newTime) => {
     setIsEvaluating(true);
@@ -134,6 +104,7 @@ export default function App() {
         newDesc,
         newTitle,
         newTime,
+        allMeals: meals,
         apiKey,
       });
 
@@ -246,16 +217,6 @@ export default function App() {
           <div className="schedule-pill">
             09:00 – 12:50
           </div>
-
-          <button
-            className="theme-toggle-btn"
-            onClick={handleOpenSettings}
-            aria-label="Definições da IA"
-            title={apiKey ? 'Modo Gemini Ativo' : 'Definir Chave Gemini (Opcional)'}
-            style={{ color: apiKey ? 'var(--primary)' : 'var(--text-sub)' }}
-          >
-            <KeyIcon />
-          </button>
 
           <button
             className="theme-toggle-btn"
@@ -405,50 +366,6 @@ export default function App() {
                   Confirmar e Guardar
                 </button>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── SETTINGS MODAL (GEMINI API KEY) ── */}
-      {isSettingsOpen && (
-        <div className="review-modal-backdrop" onClick={() => setIsSettingsOpen(false)}>
-          <div className="review-modal-box" onClick={e => e.stopPropagation()}>
-            <div className="review-modal-header">
-              <div className="review-icon-avatar">🔑</div>
-              <div>
-                <div className="review-title-sub">Configuração de IA</div>
-                <div className="review-title-main">Chave Gemini (Opcional)</div>
-              </div>
-            </div>
-
-            <p className="review-summary-text" style={{ marginBottom: 12 }}>
-              Insere a tua chave do <strong>Google AI Studio</strong> para ativar a IA do Gemini.
-              Se deixares vazio, a app funciona 100% gratuita no <strong>modo local</strong> (ideal para os teus amigos usarem sem chave).
-            </p>
-
-            <div style={{ marginBottom: 14 }}>
-              <input
-                type="password"
-                className="input-box"
-                placeholder="Cola aqui a tua chave da Gemini (AIzaSy...)"
-                value={keyInput}
-                onChange={e => setKeyInput(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-              <button className="review-btn-ai" onClick={handleSaveApiKey}>
-                Guardar Chave
-              </button>
-              {apiKey && (
-                <button className="review-btn-user" onClick={handleClearApiKey} style={{ color: 'var(--accent-red)' }}>
-                  Remover Chave (Voltar ao Modo Gratuito)
-                </button>
-              )}
-              <button className="btn-cancel" onClick={() => setIsSettingsOpen(false)} style={{ textAlign: 'center' }}>
-                Fechar
-              </button>
             </div>
           </div>
         </div>
