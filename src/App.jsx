@@ -65,8 +65,23 @@ const TABS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('plan');
-  const [meals, setMeals] = useState(DEFAULT_MEALS);
-  const [theme, setTheme] = useState('light');
+
+  // Persisted Meals state
+  const [meals, setMeals] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nutri_meals');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar refeições:', e);
+    }
+    return DEFAULT_MEALS;
+  });
+
+  // Persisted Theme state
+  const [theme, setTheme] = useState(() => localStorage.getItem('nutri_theme') || 'light');
 
   // Gemini API Key directly embedded from code / .env
   const [apiKey] = useState(() => localStorage.getItem('gemini_api_key') || GEMINI_API_KEY);
@@ -77,16 +92,43 @@ export default function App() {
   // Active Pending Review Modal
   const [pendingReview, setPendingReview] = useState(null);
 
-  // Shared Chat History
-  const [messages, setMessages] = useState([
-    {
-      id: 'init-1',
-      role: 'assistant',
-      text: 'Olá! 👋 Sou o teu assistente nutricional local. Estou a par do teu plano alimentar. Sempre que editares uma refeição, dou uma vista de olhos, faço um resumo detalhado e, caso note algum desequilíbrio, dou-te 2 opções para decidires!',
-    },
-  ]);
+  // Shared Chat History (persisted)
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nutri_chat_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [
+      {
+        id: 'init-1',
+        role: 'assistant',
+        text: 'Olá! 👋 Sou o teu assistente nutricional local. Estou a par do teu plano alimentar. Sempre que editares uma refeição, dou uma vista de olhos, faço um resumo detalhado e, caso note algum desequilíbrio, dou-te 2 opções para decidires!',
+      },
+    ];
+  });
 
+  // Save meals to localStorage on every change
   useEffect(() => {
+    try {
+      localStorage.setItem('nutri_meals', JSON.stringify(meals));
+    } catch (e) {
+      console.warn('Erro ao guardar refeições:', e);
+    }
+  }, [meals]);
+
+  // Save messages to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('nutri_chat_messages', JSON.stringify(messages));
+    } catch (e) {}
+  }, [messages]);
+
+  // Save theme
+  useEffect(() => {
+    localStorage.setItem('nutri_theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 

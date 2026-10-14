@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const DEFAULT_CATEGORIES = [
   {
@@ -49,10 +49,40 @@ const PlusIcon = () => (
 );
 
 export default function ShoppingList({ meals = [] }) {
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
-  const [checkedItems, setCheckedItems] = useState({});
+  const [categories, setCategories] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nutri_shopping_categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_CATEGORIES;
+  });
+
+  const [checkedItems, setCheckedItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nutri_shopping_checked');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
   const [newItemText, setNewItemText] = useState('');
   const [filter, setFilter] = useState('all'); // all, pending, completed
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nutri_shopping_categories', JSON.stringify(categories));
+    } catch (e) {}
+  }, [categories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nutri_shopping_checked', JSON.stringify(checkedItems));
+    } catch (e) {}
+  }, [checkedItems]);
 
   const toggleItem = (item) => {
     setCheckedItems(prev => ({ ...prev, [item]: !prev[item] }));

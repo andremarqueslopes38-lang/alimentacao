@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DEFAULT_MEALS } from '../data/meals';
 import {
   calculateTotalCalories,
@@ -41,7 +41,7 @@ const CheckIcon = () => (
 );
 
 const GripIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <circle cx="9" cy="6" r="1.5" fill="currentColor" />
     <circle cx="15" cy="6" r="1.5" fill="currentColor" />
@@ -151,10 +151,25 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
   const [editTimeVal, setEditTimeVal] = useState('09:00');
   const [editTimeNote, setEditTimeNote] = useState('');
   const [ings, setIngs] = useState([]);
-  const [doneMeals, setDoneMeals] = useState({});
   const [filter, setFilter] = useState('all');
 
-  // Custom Calorie Target (Saved to localStorage)
+  // Persisted checked meals (doneMeals)
+  const [doneMeals, setDoneMeals] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nutri_done_meals');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nutri_done_meals', JSON.stringify(doneMeals));
+    } catch (e) {}
+  }, [doneMeals]);
+
+  // Persisted Custom Calorie Target
   const [targetCalories, setTargetCalories] = useState(() => {
     const saved = localStorage.getItem('target_calories');
     return saved ? parseInt(saved, 10) : DAILY_CALORIE_TARGET;
@@ -162,7 +177,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [targetInput, setTargetInput] = useState(targetCalories);
 
-  // Drag-and-drop / Reordering State
+  // Drag-and-drop state
   const [draggedMealIndex, setDraggedMealIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
@@ -260,7 +275,6 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
       next.splice(targetIndex, 0, moved);
 
       // Reassign slot titles and times so slot positions retain their schedule names!
-      // (e.g. dragging Pequeno-Almoço to Lanche makes the top meal become Pequeno-Almoço and the old one Lanche)
       return next.map((item, idx) => ({
         ...item,
         title: slotMetadata[idx]?.title || item.title,
@@ -273,44 +287,19 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
     });
   };
 
-  // ── Desktop Drag & Drop Handlers ──
-  const handleDragStart = (e, index) => {
-    setDraggedMealIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', String(index));
+  // ── Universal Pointer Event Dragging (Smooth on Touch & Mouse) ──
+  const handlePointerDown = (e, fullIdx) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {}
+    setDraggedMealIndex(fullIdx);
+    setDragOverIndex(fullIdx);
   };
 
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== index) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDrop = (e, targetIndex) => {
-    e.preventDefault();
-    if (draggedMealIndex !== null && draggedMealIndex !== targetIndex) {
-      reorderMeals(draggedMealIndex, targetIndex);
-    }
-    setDraggedMealIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedMealIndex(null);
-    setDragOverIndex(null);
-  };
-
-  // ── Mobile Touch Handlers ──
-  const handleTouchStart = (e, index) => {
-    setDraggedMealIndex(index);
-  };
-
-  const handleTouchMove = (e) => {
+  const handlePointerMove = (e) => {
     if (draggedMealIndex === null) return;
-    const touch = e.touches[0];
-    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    const elem = document.elementFromPoint(e.clientX, e.clientY);
     const card = elem?.closest('[data-full-index]');
     if (card) {
       const idx = parseInt(card.getAttribute('data-full-index'), 10);
@@ -320,10 +309,44 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
     }
   };
 
-  const handleTouchEnd = () => {
-    if (draggedMealIndex !== null && dragOverIndex !== null && draggedMealIndex !== dragOverIndex) {
-      reorderMeals(draggedMealIndex, dragOverIndex);
+  const handlePointerUp = (e) => {
+    if (draggedMealIndex !== null) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      if (dragOverIndex !== null && dragOverIndex !== draggedMealIndex) {
+        reorderMeals(draggedMealIndex, dragOverIndex);
+      }
     }
+    setDraggedMealIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // ── Desktop HTML5 Drag Handlers ──
+  const handleDragStart = (e, fullIdx) => {
+    setDraggedMealIndex(fullIdx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(fullIdx));
+  };
+
+  const handleDragOver = (e, fullIdx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== fullIdx) {
+      setDragOverIndex(fullIdx);
+    }
+  };
+
+  const handleDrop = (e, targetIdx) => {
+    e.preventDefault();
+    if (draggedMealIndex !== null && draggedMealIndex !== targetIdx) {
+      reorderMeals(draggedMealIndex, targetIdx);
+    }
+    setDraggedMealIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
     setDraggedMealIndex(null);
     setDragOverIndex(null);
   };
@@ -441,6 +464,11 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
         <div className="progress-bar-track">
           <div className="progress-bar-fill" style={{ width: `${pct}%` }} />
         </div>
+      </div>
+
+      {/* Reorder Hint */}
+      <div className="reorder-hint-banner">
+        💡 <strong>Reordenar:</strong> Clica em <strong>▲</strong> ou <strong>▼</strong> para trocar a ordem, ou segura no <strong>⠿</strong> para arrastar.
       </div>
 
       {/* Segmented Filter */}
@@ -604,11 +632,8 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
               key={meal.id}
               data-full-index={fullIdx}
               className={`meal-card-item${isDone ? ' done' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
-              draggable={!editingId}
-              onDragStart={(e) => handleDragStart(e, fullIdx)}
               onDragOver={(e) => handleDragOver(e, fullIdx)}
               onDrop={(e) => handleDrop(e, fullIdx)}
-              onDragEnd={handleDragEnd}
             >
               <div className="meal-card-layout">
                 {/* Completed Checkbox */}
@@ -647,36 +672,42 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                   )}
                 </div>
 
-                {/* Action buttons: Reorder, Edit, Delete */}
+                {/* Action buttons: Reorder Handle, Arrows, Edit, Delete */}
                 <div className="meal-card-actions">
-                  {/* Drag Handle with touch & desktop support */}
+                  {/* Drag Handle with Pointer Capture & HTML5 Drag */}
                   <div
                     className="card-action-btn drag-handle"
-                    title="Segura e arrasta para reordenar"
+                    title="Segura e arrasta para reordenar esta refeição"
                     aria-label="Segurar para reordenar"
-                    onTouchStart={(e) => handleTouchStart(e, fullIdx)}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, fullIdx)}
+                    onDragEnd={handleDragEnd}
+                    onPointerDown={(e) => handlePointerDown(e, fullIdx)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
                   >
                     <GripIcon />
                   </div>
 
-                  {/* Quick Reorder Arrows for Mobile */}
+                  {/* Quick Reorder Arrow Buttons */}
                   <div className="reorder-arrows-column">
                     {fullIdx > 0 && (
                       <button
+                        type="button"
                         className="arrow-mini-btn"
                         onClick={(e) => { e.stopPropagation(); reorderMeals(fullIdx, fullIdx - 1); }}
-                        title="Subir refeição"
+                        title="Subir refeição (troca com a de cima)"
                       >
                         ▲
                       </button>
                     )}
                     {fullIdx < meals.length - 1 && (
                       <button
+                        type="button"
                         className="arrow-mini-btn"
                         onClick={(e) => { e.stopPropagation(); reorderMeals(fullIdx, fullIdx + 1); }}
-                        title="Descer refeição"
+                        title="Descer refeição (troca com a de baixo)"
                       >
                         ▼
                       </button>
@@ -729,14 +760,21 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
         </div>
         <ul style={{ paddingLeft: 18, fontSize: '0.82rem', color: 'var(--text-sub)', lineHeight: 1.6 }}>
           <li><strong>Frutos Secos Fixos:</strong> 10 unidades de manhã (4 avelãs, 2 cajus, 4 amêndoas).</li>
-          <li><strong>Intermutabilidade:</strong> Podes segurar e arrastar qualquer refeição para trocar a ordem.</li>
+          <li><strong>Intermutabilidade:</strong> Podes trocar a ordem de qualquer refeição usando ▲ ▼ ou arrastando ⠿.</li>
           <li><strong>Zero Balança:</strong> Usa colheres e a palma da mão para medir porções.</li>
         </ul>
       </div>
 
       {doneCount > 0 && (
         <div style={{ textAlign: 'center', marginTop: 12, marginBottom: 20 }}>
-          <button className="btn-cancel" onClick={() => setDoneMeals({})} style={{ fontSize: '0.8rem' }}>
+          <button
+            className="btn-cancel"
+            onClick={() => {
+              setDoneMeals({});
+              localStorage.removeItem('nutri_done_meals');
+            }}
+            style={{ fontSize: '0.8rem' }}
+          >
             ↺ Reiniciar progresso do dia
           </button>
         </div>
