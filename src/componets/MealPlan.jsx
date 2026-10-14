@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DEFAULT_MEALS } from '../data/meals';
 import {
   calculateTotalCalories,
@@ -7,6 +7,8 @@ import {
   getCalorieStatus,
   DAILY_CALORIE_TARGET,
 } from '../utils/calorieCalculator.js';
+import { analyzeMealPhotoWithAI } from '../services/geminiService.js';
+import { compressImage } from '../utils/imageCompressor.js';
 
 /* ── SVG Icons ── */
 const PencilIcon = () => (
@@ -41,7 +43,7 @@ const CheckIcon = () => (
 );
 
 const GripIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <circle cx="9" cy="6" r="1.5" fill="currentColor" />
     <circle cx="15" cy="6" r="1.5" fill="currentColor" />
@@ -49,6 +51,14 @@ const GripIcon = () => (
     <circle cx="15" cy="12" r="1.5" fill="currentColor" />
     <circle cx="9" cy="18" r="1.5" fill="currentColor" />
     <circle cx="15" cy="18" r="1.5" fill="currentColor" />
+  </svg>
+);
+
+const CameraIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
   </svg>
 );
 
@@ -153,6 +163,11 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
   const [ings, setIngs] = useState([]);
   const [filter, setFilter] = useState('all');
 
+  // Photo scanner state
+  const fileInputRef = useRef(null);
+  const [photoTargetMeal, setPhotoTargetMeal] = useState(null);
+  const [photoModal, setPhotoModal] = useState(null);
+
   // Persisted checked meals (doneMeals)
   const [doneMeals, setDoneMeals] = useState(() => {
     try {
@@ -250,6 +265,82 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
       localStorage.setItem('target_calories', String(num));
     }
     setIsEditingTarget(false);
+  };
+
+  // ── Photo Scanner Flow (Almoço & Jantar) ──
+  const isPhotoEligible = (meal) => {
+    if (!meal) return false;
+    const t = (meal.title || '').toLowerCase();
+    const id = meal.id || '';
+    return id === 'alm' || id === 'jan' || t.includes('almoço') || t.includes('almoco') || t.includes('jantar');
+  };
+
+  const triggerPhotoCapture = (meal) => {
+    setPhotoTargetMeal(meal);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handlePhotoSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !photoTargetMeal) return;
+
+    try {
+      const compressed = await compressImage(file, 1024, 0.85);
+
+      setPhotoModal({
+        status: 'loading',
+        previewUrl: compressed.dataUrl,
+      });
+
+      const analysis = await analyzeMealPhotoWithAI({
+        imageBase64: compressed.base64,
+        mimeType: compressed.mimeType,
+        meal: photoTargetMeal,
+        allMeals: meals,
+        targetCalories,
+      });
+
+      setPhotoModal({
+        status: 'done',
+        previewUrl: compressed.dataUrl,
+        result: analysis,
+      });
+    } catch (err) {
+      console.error('Falha ao processar foto:', err);
+      setPhotoModal({
+        status: 'error',
+        errorMsg: 'Não foi possível analisar a fotografia. Tenta novamente.',
+      });
+    }
+  };
+
+  const applyPhotoResult = () => {
+    if (!photoModal?.result || !photoTargetMeal) return;
+    const res = photoModal.result;
+
+    setMeals(prev => prev.map(m => {
+      if (m.id !== photoTargetMeal.id) return m;
+      return {
+        ...m,
+        desc: res.recognizedFood,
+        calories: res.estimatedCalories,
+        _customCalories: res.estimatedCalories,
+      };
+    }));
+
+    // Mark meal as completed for the day
+    setDoneMeals(prev => ({ ...prev, [photoTargetMeal.id]: true }));
+
+    setPhotoModal(null);
+    setPhotoTargetMeal(null);
+  };
+
+  const cancelPhoto = () => {
+    setPhotoModal(null);
+    setPhotoTargetMeal(null);
   };
 
   // ── Reorder meals and dynamically assign slot names/times ──
@@ -373,6 +464,16 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
 
   return (
     <div>
+      {/* Hidden File Input for Camera and Photo Capture */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={handlePhotoSelected}
+      />
+
       {/* Title */}
       <div className="page-title-row">
         <h1 className="page-title">Plano Alimentar</h1>
@@ -468,7 +569,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
 
       {/* Reorder Hint */}
       <div className="reorder-hint-banner">
-        💡 <strong>Reordenar:</strong> Clica em <strong>▲</strong> ou <strong>▼</strong> para trocar a ordem, ou segura no <strong>⠿</strong> para arrastar.
+        💡 <strong>Dica:</strong> No <strong>Almoço</strong> e <strong>Jantar</strong> podes tirar foto ao prato com IA 📸. Usa ▲ ▼ para trocar a ordem.
       </div>
 
       {/* Segmented Filter */}
@@ -492,6 +593,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
           const fullIdx = meals.findIndex(m => m.id === meal.id);
           const isDragging = draggedMealIndex === fullIdx;
           const isDropTarget = dragOverIndex === fullIdx && draggedMealIndex !== fullIdx;
+          const eligibleForPhoto = isPhotoEligible(meal);
 
           if (isEditing) {
             return (
@@ -502,6 +604,17 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                     Fechar
                   </button>
                 </div>
+
+                {/* Photo shortcut for lunch & dinner */}
+                {eligibleForPhoto && (
+                  <button
+                    type="button"
+                    className="edit-photo-shortcut-btn"
+                    onClick={() => triggerPhotoCapture(meal)}
+                  >
+                    📸 Em vez de escrever: Tirar Foto ao Prato com IA
+                  </button>
+                )}
 
                 {/* Meal Title */}
                 <div style={{ marginBottom: 12 }}>
@@ -665,6 +778,21 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
 
                   <p className="meal-desc-content">{meal.desc}</p>
 
+                  {/* Photo shortcut for lunch and dinner on the card */}
+                  {eligibleForPhoto && (
+                    <div>
+                      <button
+                        type="button"
+                        className="photo-meal-card-btn"
+                        onClick={(e) => { e.stopPropagation(); triggerPhotoCapture(meal); }}
+                        title="Tirar foto ao prato para calcular calorias com IA"
+                      >
+                        <CameraIcon />
+                        <span>Fotografar Prato (IA)</span>
+                      </button>
+                    </div>
+                  )}
+
                   {meal.swapNote && (
                     <div className="meal-note-box">
                       💡 {meal.swapNote}
@@ -672,8 +800,21 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                   )}
                 </div>
 
-                {/* Action buttons: Reorder Handle, Arrows, Edit, Delete */}
+                {/* Action buttons: Camera, Reorder Handle, Arrows, Edit, Delete */}
                 <div className="meal-card-actions">
+                  {/* Camera icon button for lunch & dinner */}
+                  {eligibleForPhoto && (
+                    <button
+                      type="button"
+                      className="card-action-btn camera-btn"
+                      onClick={() => triggerPhotoCapture(meal)}
+                      title="Fotografar prato com IA"
+                      aria-label="Fotografar prato com IA"
+                    >
+                      <CameraIcon />
+                    </button>
+                  )}
+
                   {/* Drag Handle with Pointer Capture & HTML5 Drag */}
                   <div
                     className="card-action-btn drag-handle"
@@ -777,6 +918,101 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
           >
             ↺ Reiniciar progresso do dia
           </button>
+        </div>
+      )}
+
+      {/* ── PHOTO ANALYSIS MODAL (POP-UP) ── */}
+      {photoModal && (
+        <div className="review-modal-backdrop" onClick={cancelPhoto}>
+          <div className="review-modal-box photo-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="review-modal-header">
+              <div className="review-icon-avatar">📸</div>
+              <div style={{ flex: 1 }}>
+                <div className="review-title-sub">Reconhecimento Visual IA</div>
+                <div className="review-title-main">{photoTargetMeal?.title || 'Refeição'}</div>
+              </div>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={cancelPhoto}
+                style={{ padding: '2px 8px', fontSize: '0.9rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {photoModal.previewUrl && (
+              <div className="photo-preview-container">
+                <img src={photoModal.previewUrl} alt="Foto do prato" className="photo-preview-img" />
+                {photoModal.status === 'done' && (
+                  <div className="photo-calorie-floating-badge">
+                    🔥 ~{photoModal.result?.estimatedCalories} kcal
+                  </div>
+                )}
+              </div>
+            )}
+
+            {photoModal.status === 'loading' && (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '2.2rem', marginBottom: 8 }}>🤖✨</div>
+                <div style={{ fontWeight: 800, color: 'var(--text-main)', marginBottom: 4, fontSize: '1rem' }}>
+                  A IA está a analisar o teu prato...
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-sub)' }}>
+                  A identificar alimentos, a calcular as calorias e a verificar se é uma boa opção para o défice diário.
+                </p>
+              </div>
+            )}
+
+            {photoModal.status === 'done' && photoModal.result && (
+              <div>
+                <div style={{ marginBottom: 12 }}>
+                  <div className="review-block-label user">🍽️ Alimentos Detetados no Prato:</div>
+                  <div className="review-block-text" style={{ fontWeight: 700, fontSize: '0.92rem' }}>
+                    {photoModal.result.recognizedFood}
+                  </div>
+                </div>
+
+                <div className={`photo-verdict-card ${photoModal.result.isGoodChoice ? 'good' : 'warning'}`}>
+                  <div className="verdict-header-row">
+                    <span className="verdict-title">{photoModal.result.verdictTitle}</span>
+                    <span className="verdict-badge-tag">
+                      {photoModal.result.isGoodChoice ? 'Boa Opção' : 'Atenção'}
+                    </span>
+                  </div>
+                  <p className="verdict-explanation">
+                    {photoModal.result.verdictExplanation}
+                  </p>
+                  {photoModal.result.tip && (
+                    <div className="verdict-tip-box">
+                      💡 <strong>Dica do Nutricionista:</strong> {photoModal.result.tip}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  <button type="button" className="review-btn-ai" onClick={applyPhotoResult} style={{ flex: 1 }}>
+                    🚀 Adicionar ao Dia e Guardar
+                  </button>
+                  <button type="button" className="btn-cancel" onClick={cancelPhoto}>
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {photoModal.status === 'error' && (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 8 }}>⚠️</div>
+                <p style={{ fontSize: '0.86rem', color: '#e11d48', marginBottom: 12 }}>
+                  {photoModal.errorMsg}
+                </p>
+                <button type="button" className="btn-cancel" onClick={cancelPhoto}>
+                  Fechar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1674,5 +1674,175 @@ input, select, textarea {
   color: var(--primary);
 }
 
+/* ═══════════════════════════════════════════════
+   MEAL PHOTO SCANNER & AI RECOGNITION
+═══════════════════════════════════════════════ */
+.photo-meal-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.18) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 99px;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.photo-meal-card-btn:hover {
+  background: linear-gradient(135deg, var(--primary) 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+  transform: translateY(-1px);
+}
+
+.card-action-btn.camera-btn {
+  color: var(--primary);
+}
+
+.card-action-btn.camera-btn:hover {
+  background-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.edit-photo-shortcut-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--bg-surface-2) 0%, var(--bg-surface-3) 100%);
+  border: 1.5px dashed var(--primary);
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 9px 12px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-photo-shortcut-btn:hover {
+  background-color: var(--primary-light);
+  border-style: solid;
+}
+
+/* Photo Modal Box */
+.photo-modal-box {
+  max-width: 420px;
+}
+
+.photo-preview-container {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  background-color: #000000;
+}
+
+.photo-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-calorie-floating-badge {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.88rem;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.photo-verdict-card {
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.photo-verdict-card.good {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.photo-verdict-card.warning {
+  background-color: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.verdict-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.verdict-badge-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.photo-verdict-card.good .verdict-badge-tag {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+[data-theme="dark"] .photo-verdict-card.good .verdict-badge-tag {
+  color: #34d399;
+}
+
+.photo-verdict-card.warning .verdict-badge-tag {
+  background-color: rgba(217, 119, 6, 0.2);
+  color: #d97706;
+}
+
+[data-theme="dark"] .photo-verdict-card.warning .verdict-badge-tag {
+  color: #fbbf24;
+}
+
+.verdict-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.verdict-explanation {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+
+.verdict-tip-box {
+  font-size: 0.76rem;
+  color: var(--text-main);
+  background: var(--bg-card);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 4px;
+}
+
 
 

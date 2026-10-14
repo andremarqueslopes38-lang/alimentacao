@@ -175,3 +175,112 @@ Pergunta do utilizador:
 
   return null;
 }
+
+/**
+ * Analyzes a meal photo using Google Gemini Vision (Multimodal).
+ * Estimates food items, calories, and evaluates if it is a good choice for the day.
+ */
+export async function analyzeMealPhotoWithAI({
+  imageBase64,
+  mimeType = 'image/jpeg',
+  meal,
+  allMeals = [],
+  targetCalories = 1800,
+  apiKey,
+}) {
+  const key = getActiveApiKey(apiKey);
+
+  const planSummary = (allMeals || [])
+    .map(m => `- ${m.title} (${m.time}): ${m.desc}`)
+    .join('\n');
+
+  const prompt = `És um nutricionista desportivo de topo especialista em análise visual de pratos e refeições.
+O utilizador trabalha em teletrabalho (turno das 09:00 às 12:50) e tirou uma fotografia real ao prato para a refeição: "${meal?.title || 'Almoço'}".
+O alvo diário de calorias do utilizador é de ~${targetCalories} kcal.
+
+Plano alimentar do utilizador hoje:
+${planSummary}
+
+Instruções para analisar esta foto de refeição:
+1. IDENTIFICAÇÃO DE ALIMENTOS: Analisa detalhadamente os alimentos visíveis no prato (proteína, hidratos de carbono, vegetais/salada, molhos, gorduras).
+2. ESTIMATIVA DE CALORIAS: Calcula com precisão realista as calorias estimadas (em kcal) para as porções visíveis no prato.
+3. AVALIAÇÃO SE É BOA OPÇÃO:
+   - Determina se é uma boa opção ("isGoodChoice": true/false) para a refeição "${meal?.title || 'Almoço'}" considerando a rotina de teletrabalho e o défice diário de ~${targetCalories} kcal.
+   - Dá a tua opinião sincera e direta como nutricionista: se for equilibrado, elogia e explica o benefício; se houver excesso de calorias, molhos ou fritos, alerta com clareza.
+4. DESCRIÇÃO FORMATADA: Constrói uma descrição limpa dos alimentos usando "+" (ex: "Peito de Frango Grelhado + Arroz Basmati + Salada de Tomate e Pepino").
+
+Responde ESTRITAMENTE em formato JSON puro (sem blocos markdown):
+{
+  "recognizedFood": "Nome dos alimentos separados por +",
+  "estimatedCalories": 550,
+  "isGoodChoice": true ou false,
+  "verdictTitle": "Título curto (ex: ✅ Excelente Escolha para o Almoço ou ⚠️ Atenção ao Excesso Calórico)",
+  "verdictExplanation": "A tua opinião profissional e direta sobre este prato no plano diário.",
+  "tip": "Dica prática para equilibrar (ex: reduz o molho ou adiciona uma salada fresca)."
+}`;
+
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: imageBase64,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: 'application/json',
+          },
+        }),
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      const cleanJson = rawText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+      const parsed = JSON.parse(cleanJson);
+
+      const calories = typeof parsed.estimatedCalories === 'number'
+        ? Math.round(parsed.estimatedCalories)
+        : parseInt(parsed.estimatedCalories, 10) || 520;
+
+      return {
+        source: 'gemini_vision',
+        modelUsed: model,
+        recognizedFood: parsed.recognizedFood || 'Refeição Fotografada',
+        estimatedCalories: calories,
+        isGoodChoice: parsed.isGoodChoice !== undefined ? Boolean(parsed.isGoodChoice) : true,
+        verdictTitle: parsed.verdictTitle || (parsed.isGoodChoice ? '✅ Boa Opção para o Plano' : '⚠️ Refeição com Alertas'),
+        verdictExplanation: parsed.verdictExplanation || 'A IA analisou os alimentos visíveis no prato e calculou o impacto no défice diário.',
+        tip: parsed.tip || 'Mantém a hidratação e porções moderadas.',
+      };
+    } catch (e) {
+      console.warn(`Gemini Vision model ${model} error:`, e);
+    }
+  }
+
+  // Fallback if API key is invalid or offline
+  const fallbackCalories = (meal?.id === 'jan' || meal?.title?.toLowerCase().includes('jantar')) ? 420 : 580;
+  return {
+    source: 'local_fallback',
+    recognizedFood: `${meal?.title || 'Refeição'} Fotografada (Modo Offline)`,
+    estimatedCalories: fallbackCalories,
+    isGoodChoice: true,
+    verdictTitle: '📸 Foto Registada',
+    verdictExplanation: 'A tua foto foi capturada com sucesso. No modo local, estimamos uma dose média equilibrada para esta refeição.',
+    tip: 'Para análise visual completa dos ingredientes por IA, verifica a tua ligação à internet.',
+  };
+}
