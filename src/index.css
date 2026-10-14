@@ -1491,3 +1491,163 @@ input, select, textarea {
   font-weight: 700;
 }
 
+/* ═══════════════════════════════════════════════
+   CALORIE TARGET INLINE EDITING
+═══════════════════════════════════════════════ */
+.target-display-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.target-display-row:hover {
+  background-color: var(--bg-surface-3);
+}
+
+.target-edit-trigger {
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 2px;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.target-display-row:hover .target-edit-trigger {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.target-edit-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.target-input-box {
+  width: 75px;
+  padding: 3px 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: 1.5px solid var(--primary);
+  border-radius: 6px;
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  outline: none;
+}
+
+.target-btn-save {
+  padding: 3px 7px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.target-btn-cancel {
+  padding: 3px 6px;
+  font-size: 0.75rem;
+  background-color: var(--bg-surface-3);
+  color: var(--text-sub);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════
+   MEAL REORDERING & DRAG-AND-DROP
+═══════════════════════════════════════════════ */
+.meal-card-item {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
+}
+
+.meal-card-item.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.98);
+  border: 2px dashed var(--primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.meal-card-item.is-drop-target {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-light), 0 4px 14px rgba(16, 185, 129, 0.2);
+  transform: translateY(-2px);
+}
+
+.meal-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin-left: 6px;
+}
+
+.card-action-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.card-action-btn:hover {
+  background-color: var(--bg-surface-3);
+  color: var(--text-main);
+}
+
+.card-action-btn.drag-handle {
+  cursor: grab;
+  color: var(--text-sub);
+}
+
+.card-action-btn.drag-handle:active {
+  cursor: grabbing;
+}
+
+.card-action-btn.delete-btn:hover {
+  background-color: rgba(225, 29, 72, 0.12);
+  color: #e11d48;
+}
+
+.reorder-arrows-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.arrow-mini-btn {
+  font-size: 0.6rem;
+  line-height: 1;
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.12s, background-color 0.12s;
+}
+
+.arrow-mini-btn:hover {
+  background-color: var(--bg-surface-3);
+  color: var(--primary);
+}
+
+

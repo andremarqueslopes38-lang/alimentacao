@@ -179,8 +179,11 @@ export function calculateConsumedCalories(meals = [], doneMealsMap = {}) {
  */
 export function getCalorieStatus(totalKcal, target = DAILY_CALORIE_TARGET) {
   const diff = totalKcal - target;
+  const lowerBound = target - 150;
+  const upperBound = target + 80;
+  const mildBound = target + 250;
 
-  if (totalKcal >= 1600 && totalKcal <= 1880) {
+  if (totalKcal >= lowerBound && totalKcal <= upperBound) {
     return {
       status: 'optimal',
       label: 'Défice Perfeito',
@@ -191,24 +194,24 @@ export function getCalorieStatus(totalKcal, target = DAILY_CALORIE_TARGET) {
     };
   }
 
-  if (totalKcal < 1600) {
+  if (totalKcal < lowerBound) {
     return {
       status: 'under',
       label: 'Défice Agressivo',
       color: '#0284c7', // sky-600
       badgeClass: 'cal-badge-under',
-      message: `${Math.abs(diff)} kcal abaixo da meta de 1800 kcal`,
+      message: `${Math.abs(diff)} kcal abaixo do teu alvo de ${target} kcal`,
       diff,
     };
   }
 
-  if (totalKcal <= 2050) {
+  if (totalKcal <= mildBound) {
     return {
       status: 'mild_surplus',
       label: 'Ligeiramente Alto',
       color: '#d97706', // amber-600
       badgeClass: 'cal-badge-mild',
-      message: `+${diff} kcal acima do défice recomendado`,
+      message: `+${diff} kcal acima do teu alvo de ${target} kcal`,
       diff,
     };
   }
@@ -218,7 +221,7 @@ export function getCalorieStatus(totalKcal, target = DAILY_CALORIE_TARGET) {
     label: 'Excesso Calórico',
     color: '#e11d48', // rose-600
     badgeClass: 'cal-badge-high',
-    message: `+${diff} kcal acima da meta diária de 1800 kcal`,
+    message: `+${diff} kcal acima do teu alvo de ${target} kcal`,
     diff,
   };
 }

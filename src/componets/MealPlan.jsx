@@ -40,6 +40,18 @@ const CheckIcon = () => (
   </svg>
 );
 
+const GripIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <circle cx="9" cy="6" r="1.5" fill="currentColor" />
+    <circle cx="15" cy="6" r="1.5" fill="currentColor" />
+    <circle cx="9" cy="12" r="1.5" fill="currentColor" />
+    <circle cx="15" cy="12" r="1.5" fill="currentColor" />
+    <circle cx="9" cy="18" r="1.5" fill="currentColor" />
+    <circle cx="15" cy="18" r="1.5" fill="currentColor" />
+  </svg>
+);
+
 const UNITS = [
   { value: 'unid.',   label: 'Unidades'       },
   { value: 'c. sopa', label: 'Colher de sopa' },
@@ -142,6 +154,18 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
   const [doneMeals, setDoneMeals] = useState({});
   const [filter, setFilter] = useState('all');
 
+  // Custom Calorie Target (Saved to localStorage)
+  const [targetCalories, setTargetCalories] = useState(() => {
+    const saved = localStorage.getItem('target_calories');
+    return saved ? parseInt(saved, 10) : DAILY_CALORIE_TARGET;
+  });
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState(targetCalories);
+
+  // Drag-and-drop / Reordering State
+  const [draggedMealIndex, setDraggedMealIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
   const filteredMeals = meals.filter(m => filter === 'all' || m.period === filter);
   const total = meals.length;
   const doneCount = Object.values(doneMeals).filter(Boolean).length;
@@ -150,7 +174,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
   // Calorie calculations
   const totalCalories = calculateTotalCalories(meals);
   const consumedCalories = calculateConsumedCalories(meals, doneMeals);
-  const calStatus = getCalorieStatus(totalCalories, DAILY_CALORIE_TARGET);
+  const calStatus = getCalorieStatus(totalCalories, targetCalories);
 
   const toggleDone = (id) => {
     setDoneMeals(prev => ({ ...prev, [id]: !prev[id] }));
@@ -185,6 +209,125 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
     setEditingId(null);
   };
 
+  const deleteMeal = (id) => {
+    if (window.confirm('Tens a certeza que queres eliminar esta refeição? O plano e as calorias serão atualizados.')) {
+      setMeals(prev => prev.filter(m => m.id !== id));
+      setDoneMeals(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      if (editingId === id) setEditingId(null);
+    }
+  };
+
+  const restoreDefaultMeals = () => {
+    if (window.confirm('Queres restaurar todas as refeições para o plano padrão?')) {
+      setMeals(DEFAULT_MEALS);
+      setEditingId(null);
+    }
+  };
+
+  const handleSaveTarget = () => {
+    const num = parseInt(targetInput, 10);
+    if (!isNaN(num) && num >= 500 && num <= 6000) {
+      setTargetCalories(num);
+      localStorage.setItem('target_calories', String(num));
+    }
+    setIsEditingTarget(false);
+  };
+
+  // ── Reorder meals and dynamically assign slot names/times ──
+  const reorderMeals = (sourceIndex, targetIndex) => {
+    if (sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0) return;
+
+    setMeals(prev => {
+      if (sourceIndex >= prev.length || targetIndex >= prev.length) return prev;
+
+      // Extract slot metadata (chronological titles & times)
+      const slotMetadata = prev.map(m => ({
+        title: m.title,
+        time: m.time,
+        period: m.period,
+        badge: m.badge,
+        badgeType: m.badgeType,
+        swapNote: m.swapNote,
+      }));
+
+      // Reorder items in the array (moving the dishes)
+      const next = [...prev];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+
+      // Reassign slot titles and times so slot positions retain their schedule names!
+      // (e.g. dragging Pequeno-Almoço to Lanche makes the top meal become Pequeno-Almoço and the old one Lanche)
+      return next.map((item, idx) => ({
+        ...item,
+        title: slotMetadata[idx]?.title || item.title,
+        time: slotMetadata[idx]?.time || item.time,
+        period: slotMetadata[idx]?.period || item.period,
+        badge: slotMetadata[idx]?.badge || item.badge,
+        badgeType: slotMetadata[idx]?.badgeType || item.badgeType,
+        swapNote: slotMetadata[idx]?.swapNote,
+      }));
+    });
+  };
+
+  // ── Desktop Drag & Drop Handlers ──
+  const handleDragStart = (e, index) => {
+    setDraggedMealIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedMealIndex !== null && draggedMealIndex !== targetIndex) {
+      reorderMeals(draggedMealIndex, targetIndex);
+    }
+    setDraggedMealIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedMealIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // ── Mobile Touch Handlers ──
+  const handleTouchStart = (e, index) => {
+    setDraggedMealIndex(index);
+  };
+
+  const handleTouchMove = (e) => {
+    if (draggedMealIndex === null) return;
+    const touch = e.touches[0];
+    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = elem?.closest('[data-full-index]');
+    if (card) {
+      const idx = parseInt(card.getAttribute('data-full-index'), 10);
+      if (!isNaN(idx) && idx !== dragOverIndex) {
+        setDragOverIndex(idx);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (draggedMealIndex !== null && dragOverIndex !== null && draggedMealIndex !== dragOverIndex) {
+      reorderMeals(draggedMealIndex, dragOverIndex);
+    }
+    setDraggedMealIndex(null);
+    setDragOverIndex(null);
+  };
+
   const updateIng = (id, field, val) => {
     setIngs(prev => prev.map(i => i.id === id ? { ...i, [field]: val } : i));
   };
@@ -213,14 +356,39 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
         <p className="page-subtitle">Turno de trabalho das 09:00 às 12:50</p>
       </div>
 
-      {/* Calorie Counter Card */}
+      {/* Calorie Counter Card with Customizable Target */}
       <div className="calorie-summary-card">
         <div className="calorie-card-header">
           <div>
             <div className="calorie-card-label">🔥 Contador Diário de Calorias</div>
             <div className="calorie-card-main">
               <span className="cal-current">{totalCalories.toLocaleString('pt-PT')}</span>
-              <span className="cal-target"> / {DAILY_CALORIE_TARGET} kcal</span>
+
+              {isEditingTarget ? (
+                <div className="target-edit-row">
+                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>/ </span>
+                  <input
+                    type="number"
+                    className="target-input-box"
+                    value={targetInput}
+                    onChange={(e) => setTargetInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveTarget()}
+                    autoFocus
+                  />
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>kcal</span>
+                  <button className="target-btn-save" onClick={handleSaveTarget} title="Guardar alvo">✓</button>
+                  <button className="target-btn-cancel" onClick={() => setIsEditingTarget(false)} title="Cancelar">✕</button>
+                </div>
+              ) : (
+                <div
+                  className="target-display-row"
+                  onClick={() => { setTargetInput(targetCalories); setIsEditingTarget(true); }}
+                  title="Clica para alterar o teu alvo de calorias"
+                >
+                  <span className="cal-target"> / {targetCalories.toLocaleString('pt-PT')} kcal</span>
+                  <button className="target-edit-trigger" aria-label="Editar alvo de calorias">✏️</button>
+                </div>
+              )}
             </div>
           </div>
           <div className={`cal-status-pill ${calStatus.badgeClass}`}>
@@ -231,7 +399,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
         <div className="calorie-bar-track">
           <div
             className={`calorie-bar-fill ${calStatus.badgeClass}`}
-            style={{ width: `${Math.min(100, Math.round((totalCalories / DAILY_CALORIE_TARGET) * 100))}%` }}
+            style={{ width: `${Math.min(100, Math.round((totalCalories / targetCalories) * 100))}%` }}
           />
         </div>
 
@@ -293,6 +461,9 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
         {filteredMeals.map(meal => {
           const isDone = !!doneMeals[meal.id];
           const isEditing = editingId === meal.id;
+          const fullIdx = meals.findIndex(m => m.id === meal.id);
+          const isDragging = draggedMealIndex === fullIdx;
+          const isDropTarget = dragOverIndex === fullIdx && draggedMealIndex !== fullIdx;
 
           if (isEditing) {
             return (
@@ -408,6 +579,14 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                   </button>
                   <button
                     className="btn-cancel"
+                    style={{ color: 'var(--accent-red)', fontSize: '0.78rem' }}
+                    onClick={() => deleteMeal(meal.id)}
+                    title="Eliminar esta refeição"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                  <button
+                    className="btn-cancel"
                     style={{ marginLeft: 'auto', fontSize: '0.78rem' }}
                     onClick={() => resetMeal(meal.id)}
                   >
@@ -421,8 +600,18 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
           const mealCalories = estimateMealCalories(meal, meal.calories);
 
           return (
-            <div key={meal.id} className={`meal-card-item${isDone ? ' done' : ''}`}>
+            <div
+              key={meal.id}
+              data-full-index={fullIdx}
+              className={`meal-card-item${isDone ? ' done' : ''}${isDragging ? ' is-dragging' : ''}${isDropTarget ? ' is-drop-target' : ''}`}
+              draggable={!editingId}
+              onDragStart={(e) => handleDragStart(e, fullIdx)}
+              onDragOver={(e) => handleDragOver(e, fullIdx)}
+              onDrop={(e) => handleDrop(e, fullIdx)}
+              onDragEnd={handleDragEnd}
+            >
               <div className="meal-card-layout">
+                {/* Completed Checkbox */}
                 <button
                   className={`check-btn${isDone ? ' checked' : ''}`}
                   onClick={() => toggleDone(meal.id)}
@@ -431,6 +620,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                   {isDone && <CheckIcon />}
                 </button>
 
+                {/* Meal Details */}
                 <div className="meal-info">
                   <div className="meal-top-meta">
                     <span className={`time-tag ${meal.period}`}>{meal.time}</span>
@@ -457,19 +647,80 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
                   )}
                 </div>
 
-                <button
-                  className="edit-trigger-btn"
-                  onClick={() => openEdit(meal)}
-                  title="Editar refeição"
-                  aria-label="Editar refeição"
-                >
-                  <PencilIcon />
-                </button>
+                {/* Action buttons: Reorder, Edit, Delete */}
+                <div className="meal-card-actions">
+                  {/* Drag Handle with touch & desktop support */}
+                  <div
+                    className="card-action-btn drag-handle"
+                    title="Segura e arrasta para reordenar"
+                    aria-label="Segurar para reordenar"
+                    onTouchStart={(e) => handleTouchStart(e, fullIdx)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    <GripIcon />
+                  </div>
+
+                  {/* Quick Reorder Arrows for Mobile */}
+                  <div className="reorder-arrows-column">
+                    {fullIdx > 0 && (
+                      <button
+                        className="arrow-mini-btn"
+                        onClick={(e) => { e.stopPropagation(); reorderMeals(fullIdx, fullIdx - 1); }}
+                        title="Subir refeição"
+                      >
+                        ▲
+                      </button>
+                    )}
+                    {fullIdx < meals.length - 1 && (
+                      <button
+                        className="arrow-mini-btn"
+                        onClick={(e) => { e.stopPropagation(); reorderMeals(fullIdx, fullIdx + 1); }}
+                        title="Descer refeição"
+                      >
+                        ▼
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Edit Pencil Button */}
+                  <button
+                    className="card-action-btn"
+                    onClick={() => openEdit(meal)}
+                    title="Editar refeição"
+                    aria-label="Editar refeição"
+                  >
+                    <PencilIcon />
+                  </button>
+
+                  {/* Delete Trash Button */}
+                  <button
+                    className="card-action-btn delete-btn"
+                    onClick={() => deleteMeal(meal.id)}
+                    title="Eliminar refeição"
+                    aria-label="Eliminar refeição"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Restore default meals if any were deleted */}
+      {meals.length < DEFAULT_MEALS.length && (
+        <div style={{ textAlign: 'center', marginTop: 12, marginBottom: 8 }}>
+          <button
+            className="btn-cancel"
+            onClick={restoreDefaultMeals}
+            style={{ fontSize: '0.8rem', color: 'var(--primary)', borderColor: 'var(--primary)' }}
+          >
+            ↺ Restaurar todas as refeições padrão ({DEFAULT_MEALS.length})
+          </button>
+        </div>
+      )}
 
       {/* Rules Card */}
       <div className="ui-card" style={{ marginTop: 8 }}>
@@ -478,7 +729,7 @@ export default function MealPlan({ meals, setMeals, onSaveMeal, isEvaluating }) 
         </div>
         <ul style={{ paddingLeft: 18, fontSize: '0.82rem', color: 'var(--text-sub)', lineHeight: 1.6 }}>
           <li><strong>Frutos Secos Fixos:</strong> 10 unidades de manhã (4 avelãs, 2 cajus, 4 amêndoas).</li>
-          <li><strong>Intermutabilidade:</strong> Pequeno-Almoço e Lanche 1 podem ser trocados sem alterar o plano.</li>
+          <li><strong>Intermutabilidade:</strong> Podes segurar e arrastar qualquer refeição para trocar a ordem.</li>
           <li><strong>Zero Balança:</strong> Usa colheres e a palma da mão para medir porções.</li>
         </ul>
       </div>
